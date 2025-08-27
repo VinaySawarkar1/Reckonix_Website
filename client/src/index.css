@@ -1,0 +1,67 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Aleo:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Spectral:wght@400;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Remove all custom Reckonix color variables, maroon/green utility classes, and hardcoded font-family/color for headings. Restore to original if any existed. */
+
+:root {
+  --primary: #800000;
+  --primary-foreground: #fff;
+  --maroon: #800000;
+  --maroon-50: #f9ecec;
+  --maroon-100: #f3d6d6;
+  --maroon-500: #800000;
+  --maroon-600: #6b0000;
+  --maroon-700: #4d0000;
+  --steel: #4682B4;
+  --gray: #A9A9A9;
+  --gold: #FFD700;
+  --coral: #FF6347;
+}
+
+body {
+  font-family: 'Spectral', Arial, Helvetica, sans-serif;
+}
+
+.font-cinzel {
+  font-family: 'Spectral', Arial, Helvetica, sans-serif;
+}
+
+.font-cinzel-decorative {
+  font-family: 'Cinzel Decorative', serif !important;
+}
+
+h1, h2, h3 {
+  font-family: inherit;
+  color: #800000;
+}
+
+.heading-white {
+  color: #fff !important;
+}
+
+@keyframes scrollLeft {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.scroll-logos {
+  display: flex;
+  width: max-content;
+  animation: scrollLeft 30s linear infinite;
+}
+
+@media (max-width: 768px) {
+  .scroll-logos {
+    animation-duration: 18s;
+  }
+}
