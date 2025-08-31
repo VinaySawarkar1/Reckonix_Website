@@ -302,6 +302,18 @@ export async function registerRoutes(app) {
             res.status(404).send('File not found');
         }
     });
+    // Team members route
+    app.get('/api/team', async (req, res) => {
+        try {
+            const db = await getDb();
+            const teamMembers = await db.collection('TeamMember').find({}).sort({ rank: 1, createdAt: -1 }).toArray();
+            res.json(teamMembers);
+        }
+        catch (error) {
+            console.error('Error fetching team members:', error);
+            res.status(500).json({ error: 'Failed to fetch team members' });
+        }
+    });
     const httpServer = createServer(app);
     return httpServer;
 }
