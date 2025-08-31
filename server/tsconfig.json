@@ -14,7 +14,9 @@
     "resolveJsonModule": true,
     "noImplicitAny": false,
     "noImplicitReturns": false,
-    "noImplicitThis": false
+    "noImplicitThis": false,
+    "noEmitOnError": false,
+    "suppressImplicitAnyIndexErrors": true
   },
   "include": [
     "**/*.ts"
