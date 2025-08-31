@@ -2,18 +2,7 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { ObjectId } from 'mongodb';
 import { getDb } from './mongo';
-import { 
-  insertProductSchema, 
-  insertQuoteRequestSchema, 
-  insertContactMessageSchema,
-  insertCompanyEventSchema,
-  insertMainCatalogSchema,
-  insertCustomerSchema,
-  loginSchema,
-  insertJobSchema,
-  insertJobApplicationSchema,
-  updateProductSchema
-} from "@shared/schema";
+// Schema imports removed - using inline validation instead
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -27,12 +16,7 @@ import twilio from 'twilio';
 // Initialize Prisma client
 // MongoDB connection is handled via getDb()
 
-// @ts-ignore: Suppress nodemailer type error if types are missing
-declare module 'nodemailer' {
-  interface SentMessageInfo {
-    messageId: string;
-  }
-}
+// Nodemailer types are handled by the package
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -517,7 +501,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           continue;
         }
         // Use the partial schema for validation
-        const validatedData = updateProductSchema.parse({ rank });
+        // Basic validation for rank
+      if (typeof rank !== 'number' || rank < 0) {
+        return res.status(400).json({ message: "Invalid rank value" });
+      }
+      const validatedData = { rank };
         const db = await getDb();
         const updated = await db.collection('Product').updateOne({ id }, { $set: validatedData });
         if (updated.modifiedCount) results.push({ id, rank });
