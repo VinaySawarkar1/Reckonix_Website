@@ -15,8 +15,7 @@
     "noImplicitAny": false,
     "noImplicitReturns": false,
     "noImplicitThis": false,
-    "noEmitOnError": false,
-    "suppressImplicitAnyIndexErrors": true
+    "noEmitOnError": false
   },
   "include": [
     "**/*.ts"
