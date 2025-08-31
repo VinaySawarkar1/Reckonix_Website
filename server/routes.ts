@@ -326,12 +326,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Team members route
   app.get('/api/team', async (req, res) => {
     try {
-      const db = await getDb();
+  const db = await getDb();
       const teamMembers = await db.collection('TeamMember').find({}).sort({ rank: 1, createdAt: -1 }).toArray();
       res.json(teamMembers);
     } catch (error) {
       console.error('Error fetching team members:', error);
       res.status(500).json({ error: 'Failed to fetch team members' });
+    }
+  });
+
+  // Customers route
+  app.get('/api/customers', async (req, res) => {
+    try {
+      const db = await getDb();
+      const customers = await db.collection('Customer').find({}).sort({ rank: 1, createdAt: -1 }).toArray();
+      res.json(customers);
+    } catch (error) {
+      console.error('Error fetching customers:', error);
+      res.status(500).json({ error: 'Failed to fetch customers' });
+    }
+  });
+
+  // Jobs route
+  app.get('/api/jobs', async (req, res) => {
+    try {
+      const db = await getDb();
+      const jobs = await db.collection('Job').find({}).sort({ createdAt: -1 }).toArray();
+      res.json(jobs);
+    } catch (error) {
+      console.error('Error fetching jobs:', error);
+      res.status(500).json({ error: 'Failed to fetch jobs' });
+    }
+  });
+
+  // Events route
+  app.get('/api/events', async (req, res) => {
+    try {
+      const db = await getDb();
+      const events = await db.collection('CompanyEvent').find({}).sort({ createdAt: -1 }).toArray();
+      res.json(events);
+    } catch (error) {
+      console.error('Error fetching events:', error);
+      res.status(500).json({ error: 'Failed to fetch events' });
+    }
+  });
+
+  // Testimonials route
+  app.get('/api/testimonials', async (req, res) => {
+    try {
+      const db = await getDb();
+      const testimonials = await db.collection('Testimonial').find({}).sort({ createdAt: -1 }).toArray();
+      res.json(testimonials);
+    } catch (error) {
+      console.error('Error fetching testimonials:', error);
+      res.status(500).json({ error: 'Failed to fetch testimonials' });
+    }
+  });
+
+  // Industries route
+  app.get('/api/industries', async (req, res) => {
+    try {
+      const db = await getDb();
+      const industries = await db.collection('Industry').find({}).sort({ rank: 1, createdAt: -1 }).toArray();
+      res.json(industries);
+    } catch (error) {
+      console.error('Error fetching industries:', error);
+      res.status(500).json({ error: 'Failed to fetch industries' });
     }
   });
 
