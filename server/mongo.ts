@@ -2,10 +2,12 @@ import { MongoClient, ServerApiVersion } from 'mongodb';
 import dotenv from 'dotenv';
 dotenv.config();
 
-const mongoUri = process.env.MONGODB_URL || 'mongodb+srv://vinaysawarkar0:vgP9DZNlkiJWNNMH@cluster0.4adl4tl.mongodb.net/';
+const mongoUri = process.env.MONGODB_URL || 'mongodb+srv://vinaysarkar0:vinasawarkar@cluster0.4adl4tl.mongodb.net/reckonix?retryWrites=true&w=majority&tls=true&tlsAllowInvalidCertificates=true';
 const client = new MongoClient(mongoUri, {
   serverApi: ServerApiVersion.v1,
   retryWrites: true,
+  tls: true,
+  tlsAllowInvalidCertificates: true,
 });
 
 let isConnected = false;

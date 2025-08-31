@@ -215,12 +215,19 @@ export default function About() {
                       src={member.photoUrl} 
                       alt={member.name}
                       className="w-24 h-24 rounded-full mx-auto mb-4 object-cover"
+                      onError={(e) => {
+                        const img = e.target as HTMLImageElement;
+                        img.style.display = 'none';
+                        // Show fallback div
+                        const fallback = img.nextElementSibling as HTMLElement;
+                        if (fallback) fallback.style.display = 'flex';
+                      }}
                     />
-                  ) : (
-                    <div className="w-24 h-24 rounded-full mx-auto mb-4 bg-gray-200 flex items-center justify-center">
-                      <Users className="h-12 w-12 text-gray-400" />
-                    </div>
-                  )}
+                  ) : null}
+                  {/* Fallback div when image fails to load or doesn't exist */}
+                  <div className={`w-24 h-24 rounded-full mx-auto mb-4 bg-gray-200 flex items-center justify-center ${member.photoUrl ? 'hidden' : 'flex'}`}>
+                    <Users className="h-12 w-12 text-gray-400" />
+                  </div>
                   <h3 className="font-semibold text-lg text-gray-900 mb-2">{member.name}</h3>
                   <p className="text-maroon-500 font-medium">{member.role}</p>
                   {member.bio && (

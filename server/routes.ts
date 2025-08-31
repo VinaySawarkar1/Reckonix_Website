@@ -34,12 +34,12 @@ const whatsappTo = '+919175240313';
 
 async function sendAdminEmail(subject: string, body: string) {
   try {
-    await transporter.sendMail({
-      from: 'vinaysawarkar53@gmail.com',
-      to: 'vinaysawarkar53@gmail.com',
-      subject,
-      text: body,
-    });
+  await transporter.sendMail({
+    from: 'vinaysawarkar53@gmail.com',
+    to: 'vinaysawarkar53@gmail.com',
+    subject,
+    text: body,
+  });
   } catch (error) {
     console.error('Failed to send email:', error);
   }
@@ -47,11 +47,11 @@ async function sendAdminEmail(subject: string, body: string) {
 
 async function sendAdminWhatsApp(body: string) {
   try {
-    await twilioClient.messages.create({
-      from: `whatsapp:${whatsappFrom}`,
-      to: `whatsapp:${whatsappTo}`,
-      body,
-    });
+  await twilioClient.messages.create({
+    from: `whatsapp:${whatsappFrom}`,
+    to: `whatsapp:${whatsappTo}`,
+    body,
+  });
   } catch (error) {
     console.error('Failed to send WhatsApp:', error);
   }
@@ -131,7 +131,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         const idNum = Number(idParam);
         if (Number.isNaN(idNum)) {
-          return res.status(400).json({ message: "Invalid product ID" });
+        return res.status(400).json({ message: "Invalid product ID" });
         }
         query = { id: idNum };
       }
@@ -146,7 +146,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (product._id) imageQuery.$or.push({ productId: product._id });
       if (typeof product.id === 'number') imageQuery.$or.push({ productId: product.id });
       
-      let images = [];
+      let images: any[] = [];
       if (imageQuery.$or.length > 0) {
         images = await db.collection('ProductImage').find(imageQuery).toArray();
       }
@@ -261,7 +261,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         const idNum = Number(idParam);
         if (Number.isNaN(idNum)) {
-          return res.status(400).json({ message: "Invalid product ID" });
+        return res.status(400).json({ message: "Invalid product ID" });
         }
         productQuery = { id: idNum };
       }
@@ -320,6 +320,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.sendFile(filePath);
     } else {
       res.status(404).send('File not found');
+    }
+  });
+
+  // Team members route
+  app.get('/api/team', async (req, res) => {
+    try {
+      const db = await getDb();
+      const teamMembers = await db.collection('TeamMember').find({}).sort({ rank: 1, createdAt: -1 }).toArray();
+      res.json(teamMembers);
+    } catch (error) {
+      console.error('Error fetching team members:', error);
+      res.status(500).json({ error: 'Failed to fetch team members' });
     }
   });
 

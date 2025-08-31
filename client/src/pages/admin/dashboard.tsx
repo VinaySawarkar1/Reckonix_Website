@@ -1311,26 +1311,26 @@ export default function AdminDashboard() {
           });
         } else {
                     // Convert to FormData
-          const formData = new FormData();
-          Object.entries(data).forEach(([key, value]) => {
-            if (key === "images" && Array.isArray(value)) {
+        const formData = new FormData();
+        Object.entries(data).forEach(([key, value]) => {
+          if (key === "images" && Array.isArray(value)) {
               // Backend expects 'images' field
-              value.forEach((file: File) => formData.append("images", file));
-            } else if (key === "existingImages" && Array.isArray(value)) {
-              formData.append(key, JSON.stringify(value));
-            } else if (
-              key === "specifications" ||
-              key === "featuresBenefits" ||
-              key === "applications" ||
-              key === "certifications" ||
+            value.forEach((file: File) => formData.append("images", file));
+          } else if (key === "existingImages" && Array.isArray(value)) {
+            formData.append(key, JSON.stringify(value));
+          } else if (
+            key === "specifications" ||
+            key === "featuresBenefits" ||
+            key === "applications" ||
+            key === "certifications" ||
               key === "technicalDetails" ||
               key === "imageGallery"
-            ) {
-              formData.append(key, JSON.stringify(value));
-            } else if (value !== undefined && value !== null) {
-              formData.append(key, value);
-            }
-          });
+          ) {
+            formData.append(key, JSON.stringify(value));
+          } else if (value !== undefined && value !== null) {
+            formData.append(key, value);
+          }
+        });
           
           console.log("Converted FormData contents:");
           for (let [key, value] of formData.entries()) {

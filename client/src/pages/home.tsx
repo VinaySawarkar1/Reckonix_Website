@@ -148,12 +148,29 @@ export default function Home() {
           key={`hero-video-${Date.now()}`}
           onLoadStart={() => console.log('Video loading started:', '/hero-video-new.mp4')}
           onLoadedData={() => console.log('Video data loaded successfully')}
-          onError={(e) => console.error('Video error:', e)}
+          onError={(e) => {
+            console.error('Video error:', e);
+            // Fallback to background image when video fails
+            const videoElement = e.target as HTMLVideoElement;
+            if (videoElement) {
+              videoElement.style.display = 'none';
+            }
+          }}
           onCanPlay={() => console.log('Video can play')}
           preload="auto"
         >
           <source src="/hero-video-new.mp4" type="video/mp4" />
         </video>
+        
+        {/* Fallback background image when video is not available */}
+        <div 
+          className="absolute inset-0 w-full h-full object-cover z-0"
+          style={{
+            background: 'linear-gradient(135deg, #800000 0%, #4d0000 100%)',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center'
+          }}
+        />
         
         {/* Gray overlay for better text readability */}
         <div className="absolute inset-0 bg-gray-900 bg-opacity-50 z-20 pointer-events-none" />
@@ -216,7 +233,24 @@ export default function Home() {
                 src="/generated-image (1).png"
                 alt="Advanced industrial precision equipment"
                 className="rounded-xl shadow-lg w-full max-w-md h-auto mx-auto"
+                onError={(e) => {
+                  const img = e.target as HTMLImageElement;
+                  img.style.display = 'none';
+                  // Show fallback div
+                  const fallback = img.nextElementSibling as HTMLElement;
+                  if (fallback) fallback.style.display = 'block';
+                }}
               />
+              {/* Fallback div when image fails to load */}
+              <div 
+                className="rounded-xl shadow-lg w-full max-w-md h-64 mx-auto bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center"
+                style={{ display: 'none' }}
+              >
+                <div className="text-center text-gray-500">
+                  <div className="text-4xl mb-2">🏭</div>
+                  <div className="text-sm">Precision Equipment</div>
+                </div>
+              </div>
             </motion.div>
             <motion.div
               initial={{ opacity: 0, x: 50 }}
