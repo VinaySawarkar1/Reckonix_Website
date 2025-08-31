@@ -313,6 +313,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Catalog route
+  app.get('/api/catalog/main-catalog', async (req, res) => {
+    try {
+      const db = await getDb();
+      const catalog = await db.collection('MainCatalog').findOne({});
+      res.json(catalog || {});
+    } catch (error) {
+      console.error('Error fetching catalog:', error);
+      res.status(500).json({ error: 'Failed to fetch catalog' });
+    }
+  });
+
+  // Chatbot summaries route
+  app.get('/api/chatbot-summaries', async (req, res) => {
+    try {
+      const db = await getDb();
+      const summaries = await db.collection('ChatbotSummary').find({}).sort({ createdAt: -1 }).toArray();
+      res.json(summaries);
+    } catch (error) {
+      console.error('Error fetching chatbot summaries:', error);
+      res.status(500).json({ error: 'Failed to fetch chatbot summaries' });
+    }
+  });
+
+  // Save chatbot conversation
+  app.post('/api/chatbot-summaries', async (req, res) => {
+    try {
+      const { userMessage, botResponse, userInfo } = req.body;
+      
+      if (!userMessage || !botResponse) {
+        return res.status(400).json({ error: 'User message and bot response are required' });
+      }
+
+      const db = await getDb();
+      const summary = {
+        id: Date.now(),
+        userMessage,
+        botResponse,
+        userInfo: userInfo || {},
+        createdAt: new Date(),
+        status: 'new'
+      };
+
+      await db.collection('ChatbotSummary').insertOne(summary);
+      res.json({ success: true, message: 'Conversation saved successfully' });
+    } catch (error) {
+      console.error('Error saving chatbot summary:', error);
+      res.status(500).json({ error: 'Failed to save conversation' });
+    }
+  });
+
+  // Export chatbot summaries to Excel
+  app.get('/api/chatbot-summaries/excel', async (req, res) => {
+    try {
+      const db = await getDb();
+      const summaries = await db.collection('ChatbotSummary').find({}).sort({ createdAt: -1 }).toArray();
+      
+      // Create CSV content
+      const csvContent = [
+        'ID,User Message,Bot Response,User Info,Date,Status',
+        ...summaries.map(s => [
+          s.id,
+          `"${s.userMessage.replace(/"/g, '""')}"`,
+          `"${s.botResponse.replace(/"/g, '""')}"`,
+          `"${JSON.stringify(s.userInfo).replace(/"/g, '""')}"`,
+          s.createdAt,
+          s.status
+        ].join(','))
+      ].join('\n');
+
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename="chatbot-summaries.csv"');
+      res.send(csvContent);
+    } catch (error) {
+      console.error('Error exporting chatbot summaries:', error);
+      res.status(500).json({ error: 'Failed to export summaries' });
+    }
+  });
+
   // Serve uploaded files
   app.use('/uploads/products', (req, res, next) => {
     const filePath = path.join(uploadsDir, req.path);

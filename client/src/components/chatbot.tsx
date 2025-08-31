@@ -1,17 +1,96 @@
 import React, { useState, useRef, useEffect } from "react";
 
-const API_URL = "https://openrouter.ai/api/v1/chat/completions";
-const API_KEY = "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";
-// Switch to a more reliable model for testing
-const MODEL = "openai/gpt-3.5-turbo";
-
-const SYSTEM_PROMPT = `You are Reckonix AI Assistant, an expert on Reckonix Calibration, Testing, and Measuring Systems. Only answer questions related to Reckonix, its products, services, and support. If a user asks about sales, support, or has a query, always ask for their name, email, phone, company, and their specific query. Politely decline to answer questions not related to Reckonix. If the user provides contact info, acknowledge and thank them, and let them know a representative will follow up.`;
+// Rule-based chatbot system - no external APIs needed
+const RULES = {
+  // Greetings and basic responses
+  greetings: {
+    patterns: ['hello', 'hi', 'hey', 'good morning', 'good afternoon', 'good evening'],
+    responses: [
+      "Hello! Welcome to Reckonix. How can I assist you today?",
+      "Hi there! I'm here to help with Reckonix products and services.",
+      "Hello! Welcome to Reckonix. What can I help you with?"
+    ]
+  },
+  
+  // Product information
+  products: {
+    patterns: ['product', 'calibration', 'testing', 'measuring', 'equipment', 'instruments'],
+    responses: [
+      "Reckonix offers a wide range of calibration, testing, and measuring equipment. We have products for metrology systems, pressure calibration, temperature calibration, and more. Would you like to know about a specific category?",
+      "Our product line includes precision instruments for industrial calibration, testing equipment, and measuring systems. What type of equipment are you looking for?"
+    ]
+  },
+  
+  // Metrology systems
+  metrology: {
+    patterns: ['metrology', 'vmm', 'vision', 'measuring machine', 'coordinate'],
+    responses: [
+      "Reckonix offers advanced VMM (Vision Measuring Machines) and metrology systems. Our VMM ULTRA series provides high-precision measurements with accuracy up to 2.5+L/200. Would you like to know more about our metrology solutions?",
+      "We have VMM PRO and VMM ULTRA series for precision metrology applications. These systems offer advanced measurement capabilities for quality control and inspection."
+    ]
+  },
+  
+  // Calibration services
+  calibration: {
+    patterns: ['calibration service', 'calibrate', 'certification', 'traceability'],
+    responses: [
+      "Reckonix provides comprehensive calibration services with NABL accreditation. We offer on-site and laboratory calibration for various instruments. Our services include pressure, temperature, dimensional, and electrical calibration.",
+      "We offer calibration services with full traceability to national standards. Our NABL accredited laboratory ensures accurate and reliable calibration results."
+    ]
+  },
+  
+  // Contact and sales
+  contact: {
+    patterns: ['contact', 'sales', 'quote', 'price', 'buy', 'purchase', 'inquiry'],
+    responses: [
+      "I'd be happy to connect you with our sales team. Could you please provide your name, company, and what you're looking for?",
+      "For sales inquiries and quotes, I'll need some information. What's your name and company? Also, what specific products or services are you interested in?"
+    ]
+  },
+  
+  // Support and technical
+  support: {
+    patterns: ['support', 'help', 'technical', 'problem', 'issue', 'maintenance'],
+    responses: [
+      "For technical support and maintenance, please contact our support team. Could you provide your contact details and describe the issue you're experiencing?",
+      "I can help connect you with our technical support team. Please share your name, company, and a brief description of the technical issue."
+    ]
+  },
+  
+  // Company information
+  company: {
+    patterns: ['company', 'about', 'reckonix', 'location', 'office', 'address'],
+    responses: [
+      "Reckonix is a leading provider of calibration, testing, and measuring systems in India. We specialize in precision instruments and offer comprehensive solutions for quality control and metrology applications.",
+      "We're headquartered in India and serve customers across various industries including automotive, aerospace, manufacturing, and more. Our focus is on precision and reliability in all our products and services."
+    ]
+  },
+  
+  // Industries served
+  industries: {
+    patterns: ['industry', 'automotive', 'aerospace', 'manufacturing', 'pharmaceutical', 'oil and gas'],
+    responses: [
+      "Reckonix serves multiple industries including automotive, aerospace, manufacturing, pharmaceutical, oil & gas, and more. Our precision instruments are designed to meet the demanding requirements of these sectors.",
+      "We work with various industries that require high-precision measurements and reliable calibration services. Our solutions are tailored to meet industry-specific needs and standards."
+    ]
+  },
+  
+  // Default response
+  default: {
+    patterns: [],
+    responses: [
+      "I'm here to help with Reckonix products and services. Could you please rephrase your question or let me know what specific information you need?",
+      "I'm not sure I understood that. Could you tell me more about what you're looking for regarding Reckonix products or services?"
+    ]
+  }
+};
 
 const BOT_ICON = (
   <div className="flex items-center justify-center w-8 h-8 rounded-full bg-[#800000] text-white font-bold text-lg shadow-md">
     <svg width="22" height="22" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#800000"/><ellipse cx="12" cy="15" rx="6" ry="3" fill="#fff"/><circle cx="9" cy="10" r="1.5" fill="#fff"/><circle cx="15" cy="10" r="1.5" fill="#fff"/></svg>
   </div>
 );
+
 const USER_ICON = (
   <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-300 text-gray-700 font-bold text-lg shadow-md">
     <svg width="22" height="22" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" fill="#a3a3a3"/><ellipse cx="12" cy="17" rx="7" ry="4" fill="#a3a3a3"/></svg>
@@ -23,31 +102,89 @@ function ChatbotHeader() {
     <div className="bg-[#800000] text-white px-4 py-3 rounded-t-2xl font-bold text-lg flex items-center justify-between shadow-md">
       <span className="flex items-center gap-2">
         <svg width="28" height="28" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#fff"/><ellipse cx="12" cy="15" rx="6" ry="3" fill="#800000"/><circle cx="9" cy="10" r="1.5" fill="#800000"/><circle cx="15" cy="10" r="1.5" fill="#800000"/></svg>
-        Reckonix AI Chatbot
+        Reckonix AI Assistant
       </span>
       <button className="text-white hover:text-gray-200 text-2xl font-bold ml-2 focus:outline-none" id="close-chatbot-btn" aria-label="Close chat">×</button>
     </div>
   );
 }
 
+// Rule-based response function
+function getBotResponse(userMessage: string, conversationState: any): string {
+  const message = userMessage.toLowerCase().trim();
+  
+  // Check if user is providing contact information
+  if (conversationState.askingForContact) {
+    if (message.includes('@') || message.includes('phone') || message.includes('company')) {
+      conversationState.askingForContact = false;
+      conversationState.contactInfo = true;
+      return "Thank you for providing your information! Our team will contact you within 24 hours. Is there anything else I can help you with regarding Reckonix products or services?";
+    }
+  }
+  
+  // Check for greetings first
+  if (RULES.greetings.patterns.some(pattern => message.includes(pattern))) {
+    return RULES.greetings.responses[Math.floor(Math.random() * RULES.greetings.responses.length)];
+  }
+  
+  // Check for product inquiries
+  if (RULES.products.patterns.some(pattern => message.includes(pattern))) {
+    return RULES.products.responses[Math.floor(Math.random() * RULES.products.responses.length)];
+  }
+  
+  // Check for metrology specific queries
+  if (RULES.metrology.patterns.some(pattern => message.includes(pattern))) {
+    return RULES.metrology.responses[Math.floor(Math.random() * RULES.metrology.responses.length)];
+  }
+  
+  // Check for calibration services
+  if (RULES.calibration.patterns.some(pattern => message.includes(pattern))) {
+    return RULES.calibration.responses[Math.floor(Math.random() * RULES.calibration.responses.length)];
+  }
+  
+  // Check for contact/sales inquiries
+  if (RULES.contact.patterns.some(pattern => message.includes(pattern))) {
+    conversationState.askingForContact = true;
+    return RULES.contact.responses[Math.floor(Math.random() * RULES.contact.responses.length)];
+  }
+  
+  // Check for support inquiries
+  if (RULES.support.patterns.some(pattern => message.includes(pattern))) {
+    conversationState.askingForContact = true;
+    return RULES.support.responses[Math.floor(Math.random() * RULES.support.responses.length)];
+  }
+  
+  // Check for company information
+  if (RULES.company.patterns.some(pattern => message.includes(pattern))) {
+    return RULES.company.responses[Math.floor(Math.random() * RULES.company.responses.length)];
+  }
+  
+  // Check for industry information
+  if (RULES.industries.patterns.some(pattern => message.includes(pattern))) {
+    return RULES.industries.responses[Math.floor(Math.random() * RULES.industries.responses.length)];
+  }
+  
+  // Default response
+  return RULES.default.responses[Math.floor(Math.random() * RULES.default.responses.length)];
+}
+
 export default function Chatbot() {
-  const [messages, setMessages] = useState([
-    { role: "system", content: SYSTEM_PROMPT }
-  ]);
+  const [messages, setMessages] = useState<Array<{role: string, content: string}>>([]);
   const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [askedName, setAskedName] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [errorMsg, setErrorMsg] = useState("");
+  const [conversationState, setConversationState] = useState({
+    askingForContact: false,
+    contactInfo: false
+  });
 
-  // Show welcome and ask name on first open
+  // Show welcome message on first open
   useEffect(() => {
     if (open && !askedName) {
-      setMessages(prev => [
-        ...prev,
-        { role: "assistant", content: "Welcome to Reckonix! We're here to assist you." },
-        { role: "assistant", content: "First, can we have your name please?" }
+      setMessages([
+        { role: "assistant", content: "Welcome to Reckonix! I'm your AI assistant, here to help with information about our calibration, testing, and measuring systems." },
+        { role: "assistant", content: "How can I assist you today? You can ask me about our products, services, or company information." }
       ]);
       setAskedName(true);
     }
@@ -61,51 +198,24 @@ export default function Chatbot() {
     }
   }, [open]);
 
-  const sendMessage = async (e: React.FormEvent) => {
+  const sendMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMsg("");
     if (!input.trim()) return;
-    if (!API_KEY) {
-      setErrorMsg("API key is missing. Please set your OpenRouter API key.");
-      return;
-    }
-    const newMessages = [...messages, { role: "user", content: input }];
+    
+    const userMessage = input.trim();
+    const newMessages = [...messages, { role: "user", content: userMessage }];
     setMessages(newMessages);
     setInput("");
-    setLoading(true);
-    try {
-      const response = await fetch(API_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: MODEL,
-          messages: newMessages.filter(m => m.role !== "system"),
-          max_tokens: 512,
-        }),
-      });
-      const data = await response.json();
-      let aiMessage = "";
-      if (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) {
-        aiMessage = data.choices[0].message.content.trim();
-      } else if (data.error && data.error.message) {
-        console.error("AI Error:", data.error);
-        setErrorMsg("AI Error: " + (data.error.message || "Unknown error. Please try again later."));
-        aiMessage = "Sorry, our AI service is temporarily unavailable. Please try again later.";
-      } else {
-        setErrorMsg("Unknown error from AI service. Please try again later.");
-        aiMessage = "Sorry, I couldn't get a response from the AI.";
-      }
-      setMessages([...newMessages, { role: "assistant", content: aiMessage }]);
-    } catch (err) {
-      console.error("Network/Fetch Error:", err);
-      setErrorMsg("Network error: " + (err instanceof Error ? err.message : String(err)));
-      setMessages([...newMessages, { role: "assistant", content: "Sorry, there was a network error. Please try again later." }]);
-    }
-    setLoading(false);
-    setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+    
+    // Get bot response using rule-based system
+    const botResponse = getBotResponse(userMessage, conversationState);
+    setConversationState({...conversationState}); // Update state
+    
+    // Add bot response
+    setTimeout(() => {
+      setMessages([...newMessages, { role: "assistant", content: botResponse }]);
+      setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+    }, 500); // Small delay to simulate typing
   };
 
   // Floating chat button
@@ -121,9 +231,8 @@ export default function Chatbot() {
           aria-label="Chat on WhatsApp"
           style={{ boxShadow: '0 4px 24px rgba(16,185,129,0.25)' }}
         >
-          {/* Crisp WhatsApp glyph */}
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="26" height="26" className="text-white" aria-hidden="true">
-            <path fill="currentColor" d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.472-.149-.672.15-.197.296-.767.966-.94 1.164-.173.198-.347.223-.644.074-1.749-.875-2.897-1.562-4.064-3.537-.307-.527.307-.489.874-1.63.097-.198.048-.371-.024-.52-.074-.149-.672-1.612-.921-2.207-.242-.579-.487-.5-.672-.51-.173-.01-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.095 3.2 5.076 4.487.709.306 1.262.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.29.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.516-5.263c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.879 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.85 11.85 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.892a11.82 11.82 0 00-3.483-8.414" />
+            <path fill="currentColor" d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.472-.149-.672.15-.197.296-.767.966-.94 1.164-.173.198-.347.223-.644.074-1.749-.875-2.897-1.562-4.064-3.537-.307-.527.307-.489.874-1.63.097-.198.048-.371-.024-.52-.074-.149-.672-1.612-.921-2.207-.242-.579-.487-.5-.672-.51-.173-.01-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.095 3.2 5.076 4.487.709.306 1.262.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.29.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.516-5.263c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.85 0 012.893 6.994c-.003 5.45-4.437 9.884-9.879 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.85 11.85 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.892a11.82 11.82 0 00-3.483-8.414" />
           </svg>
         </a>
 
@@ -168,16 +277,13 @@ export default function Chatbot() {
         className="max-w-[95vw] bg-gradient-to-br from-[#fff] via-[#f8eaea] to-[#f3f3f3] border border-gray-200 rounded-2xl shadow-2xl flex flex-col"
         style={chatWindowStyle}
       >
-        {/* Header (always render) */}
+        {/* Header */}
         <ChatbotHeader />
-        {/* Error message */}
-        {errorMsg && (
-          <div className="bg-red-100 text-red-700 px-4 py-2 text-sm text-center">{errorMsg}</div>
-        )}
+        
         {/* Chat area */}
         <div className="flex-1 flex flex-col" style={{background: 'transparent', borderBottom: '1px solid #e5e7eb'}}>
           <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4" style={{maxHeight: '420px', minHeight: '120px', borderRadius: '8px', boxShadow: '0 1px 2px rgba(0,0,0,0.03)'}}>
-            {messages.filter(m => m.role !== "system").map((msg, i) => (
+            {messages.map((msg, i) => (
               <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"} items-end`}>
                 {msg.role === "assistant" && <div className="mr-2">{BOT_ICON}</div>}
                 <div
@@ -198,14 +304,9 @@ export default function Chatbot() {
                 {msg.role === "user" && <div className="ml-2">{USER_ICON}</div>}
               </div>
             ))}
-            {loading && (
-              <div className="flex items-end gap-2">
-                <div>{BOT_ICON}</div>
-                <div className="rounded-2xl px-4 py-2 bg-white text-gray-900 border border-gray-200 shadow-sm animate-pulse" style={{fontSize: '1rem', maxWidth: '60%'}}>Typing…</div>
-              </div>
-            )}
             <div ref={messagesEndRef} />
           </div>
+          
           {/* Input area */}
           <form onSubmit={sendMessage} className="flex items-center gap-2 border-t border-gray-200 px-3 py-3 bg-white" style={{minHeight: '56px', borderRadius: '0 0 0 0'}}>
             <button type="button" className="text-gray-400 hover:text-gray-600 p-1" tabIndex={-1} title="Emoji (not implemented)"><span role="img" aria-label="emoji">😊</span></button>
@@ -215,13 +316,12 @@ export default function Chatbot() {
               placeholder="Type a message ..."
               value={input}
               onChange={e => setInput(e.target.value)}
-              disabled={loading}
               style={{minWidth: 0}}
             />
             <button
               type="submit"
               className="px-4 py-2 rounded-lg bg-[#800000] text-white font-semibold hover:bg-[#6b0000] transition flex items-center justify-center"
-              disabled={loading || !input.trim()}
+              disabled={!input.trim()}
               style={{minWidth: 44, minHeight: 44}}
             >
               <svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>

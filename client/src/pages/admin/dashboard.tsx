@@ -3393,12 +3393,14 @@ export default function AdminDashboard() {
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-3">
-                        {productViews.slice(0, 5).map((product) => (
-                          <div key={product.productId} className="flex justify-between items-center">
-                            <span className="text-sm text-gray-700 truncate">{product.productName}</span>
-                            <Badge variant="outline">{product.views} views</Badge>
+                        {productViews?.products?.slice(0, 5).map((product) => (
+                          <div key={product._id || product.id} className="flex justify-between items-center">
+                            <span className="text-sm text-gray-700 truncate">{product.name}</span>
+                            <Badge variant="outline">{product.views || 0} views</Badge>
                           </div>
-                        ))}
+                        )) || (
+                          <div className="text-gray-500 text-sm">No product view data available</div>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
