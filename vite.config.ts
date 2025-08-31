@@ -38,6 +38,7 @@ export default defineConfig({
     },
     proxy: {
       '/api': 'http://localhost:5001',
+      '/uploads': 'http://localhost:5001',
     },
   },
 }); 

@@ -1,6 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
-import { PrismaClient } from '@prisma/client';
+import { ObjectId } from 'mongodb';
+import { getDb } from './mongo';
 import { 
   insertProductSchema, 
   insertQuoteRequestSchema, 
@@ -24,7 +25,7 @@ import nodemailer from 'nodemailer';
 import twilio from 'twilio';
 
 // Initialize Prisma client
-const prisma = new PrismaClient();
+// MongoDB connection is handled via getDb()
 
 // @ts-ignore: Suppress nodemailer type error if types are missing
 declare module 'nodemailer' {
@@ -122,9 +123,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/testimonials", async (req: Request, res: Response) => {
     console.log("GET /api/testimonials route hit");
     try {
-      const testimonials = await prisma.testimonial.findMany({ 
-        orderBy: { createdAt: "desc" } 
-      });
+      const db = await getDb();
+      const testimonials = await db.collection('Testimonial').find({}).sort({ createdAt: -1 }).toArray();
       console.log("Found testimonials:", testimonials.length);
       res.json(testimonials);
     } catch (error) {
@@ -136,18 +136,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/testimonials", async (req: Request, res: Response) => {
     console.log("POST /api/testimonials route hit");
     try {
+      const db = await getDb();
       const { name, role, company, content, rating, featured } = req.body;
       console.log("Creating testimonial:", { name, role, company, content, rating, featured });
-      const testimonial = await prisma.testimonial.create({
-        data: { 
-          name, 
-          role, 
-          company, 
-          content, 
-          rating: rating ?? 5, 
-          featured: featured ?? false 
-        },
+      const result = await db.collection('Testimonial').insertOne({
+        name,
+        role,
+        company,
+        content,
+        rating: rating ?? 5,
+        featured: featured ?? false,
+        createdAt: new Date()
       });
+      const testimonial = await db.collection('Testimonial').findOne({ _id: result.insertedId });
       console.log("Created testimonial:", testimonial);
       res.status(201).json(testimonial);
     } catch (error) {
@@ -158,13 +159,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/testimonials/:id", async (req: Request, res: Response) => {
     try {
-      const id = parseInt(req.params.id);
+      const db = await getDb();
+      const id = req.params.id;
       const { name, role, company, content, rating, featured } = req.body;
-      const testimonial = await prisma.testimonial.update({
-        where: { id },
-        data: { name, role, company, content, rating, featured },
-      });
-      res.json(testimonial);
+      const result = await db.collection('Testimonial').findOneAndUpdate(
+        { _id: new ObjectId(id) },
+        { $set: { name, role, company, content, rating, featured } },
+        { returnDocument: 'after' }
+      );
+      res.json(result.value);
     } catch (error) {
       res.status(400).json({ message: "Failed to update testimonial", details: error instanceof Error ? error.message : error });
     }
@@ -172,8 +175,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/testimonials/:id", async (req: Request, res: Response) => {
     try {
-      const id = parseInt(req.params.id);
-      await prisma.testimonial.delete({ where: { id } });
+      const db = await getDb();
+      const id = req.params.id;
+      await db.collection('Testimonial').deleteOne({ _id: new ObjectId(id) });
       res.json({ message: "Testimonial deleted successfully" });
     } catch (error) {
       res.status(400).json({ message: "Failed to delete testimonial", details: error instanceof Error ? error.message : error });
@@ -183,17 +187,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Authentication routes
   app.post("/api/auth/login", async (req: Request, res: Response) => {
     try {
-      const { username, password } = loginSchema.parse(req.body);
-      
-      const user = await prisma.user.findUnique({ where: { username } });
+      const { username, password } = req.body;
+      if (!username || !password) {
+        return res.status(400).json({ message: "Username and password are required" });
+      }
+      const db = await getDb();
+      const user = await db.collection('User').findOne({ username });
       if (!user || user.password !== password) {
         return res.status(401).json({ message: "Invalid credentials" });
       }
-
       // In production, use proper JWT and password hashing
-      res.json({ 
-        user: { id: user.id, username: user.username, role: user.role },
-        token: `mock-jwt-${user.id}` // Mock token for demo
+      res.json({
+        user: { id: user._id, username: user.username, role: user.role },
+        token: `mock-jwt-${user._id}` // Mock token for demo
       });
     } catch (error) {
       res.status(400).json({ message: "Invalid request data" });
@@ -204,11 +210,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/products", async (req: Request, res: Response) => {
     try {
       const category = req.query.category as string | undefined;
-      let products = await prisma.product.findMany({
-        where: category ? { category: category } : undefined,
-        include: { images: true }
+      const db = await getDb();
+      // Get products first
+      const products = await db.collection('Product').find({}).sort({ createdAt: -1 }).toArray();
+      
+      // Fetch images for each product separately (more reliable than complex aggregation)
+      for (const product of products) {
+        const imageQuery: any = { $or: [] as any[] };
+        if (product._id) imageQuery.$or.push({ productId: product._id });
+        if (typeof product.id === 'number') imageQuery.$or.push({ productId: product.id });
+        
+        if (imageQuery.$or.length > 0) {
+          product.images = await db.collection('ProductImage').find(imageQuery).toArray();
+        } else {
+          product.images = [];
+        }
+      }
+
+      // Fallback: if no images via lookup, use imageGallery/imageUrl. Also ensure id exists
+      const enriched = products.map((p: any) => {
+        try {
+          const galleryRaw = p.imageGallery;
+          const galleryArr = Array.isArray(galleryRaw)
+            ? galleryRaw
+            : (typeof galleryRaw === 'string' ? JSON.parse(galleryRaw || '[]') : []);
+          if ((!p.images || p.images.length === 0) && Array.isArray(galleryArr) && galleryArr.length > 0) {
+            p.images = galleryArr.map((url: any) => ({ url: typeof url === 'string' ? url : url?.url })).filter((u: any) => u && u.url);
+          }
+        } catch {}
+        if (p.images && Array.isArray(p.images)) {
+          p.images = p.images.filter((img: any) => img && typeof img.url === 'string');
+        }
+        if (p.id === undefined || p.id === null) {
+          // expose string id for frontend routing when numeric id is absent
+          p.id = String(p._id);
+        }
+        return p;
       });
-      res.json(products);
+      res.json(enriched);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch products" });
     }
@@ -216,82 +255,108 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/products/:id", async (req: Request, res: Response) => {
     try {
-      const id = parseInt(req.params.id);
-      if (isNaN(id)) {
-        return res.status(400).json({ message: "Invalid product ID" });
+      const idParam = req.params.id;
+      const db = await getDb();
+
+      let query: any;
+      if (ObjectId.isValid(idParam) && idParam.length === 24) {
+        query = { _id: new ObjectId(idParam) };
+      } else {
+        const idNum = Number(idParam);
+        if (Number.isNaN(idNum)) {
+          return res.status(400).json({ message: "Invalid product ID" });
+        }
+        query = { id: idNum };
       }
 
-      const product = await prisma.product.findUnique({
-        where: { id },
-        include: { images: true }
-      });
+      const product: any = await db.collection('Product').findOne(query);
       if (!product) {
         return res.status(404).json({ message: "Product not found" });
       }
 
       // Increment view count
-      await prisma.product.update({
-        where: { id },
-        data: { views: { increment: 1 } },
-      });
-      
+      await db.collection('Product').updateOne(query, { $inc: { views: 1 } });
+
+      // Fetch images by productId supporting both ObjectId and numeric id
+      const imageQuery: any = { $or: [] as any[] };
+      if (product._id) imageQuery.$or.push({ productId: product._id });
+      if (typeof product.id === 'number') imageQuery.$or.push({ productId: product.id });
+      let images = [] as any[];
+      if (imageQuery.$or.length > 0) {
+        images = await db.collection('ProductImage').find(imageQuery).toArray();
+      }
+      product.images = images;
+
+      // Fallback to imageGallery/imageUrl
+      if ((!product.images || product.images.length === 0)) {
+        try {
+          const galleryRaw = product.imageGallery;
+          const galleryArr = Array.isArray(galleryRaw)
+            ? galleryRaw
+            : (typeof galleryRaw === 'string' ? JSON.parse(galleryRaw || '[]') : []);
+          if (Array.isArray(galleryArr) && galleryArr.length > 0) {
+            product.images = galleryArr.map((url: any) => ({ url: typeof url === 'string' ? url : url?.url })).filter((u: any) => u && u.url);
+          } else if (product.imageUrl) {
+            product.images = [{ url: product.imageUrl }];
+          }
+        } catch {}
+      }
+
+      if (product.id === undefined || product.id === null) {
+        product.id = String(product._id);
+      }
+
       res.json(product);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch product" });
     }
   });
 
-  // Update product image upload setup for multiple images
-  const productImageStorage = multer.diskStorage({
-    destination: function (req, file, cb) {
-      cb(null, path.join(__dirname, "../uploads/products/"));
+  // Update product image upload setup for multiple images - use the same config as main upload
+  const productImageUpload = multer({
+    storage: storageConfig,
+    limits: {
+      fileSize: 5 * 1024 * 1024, // 5MB limit
+      files: 10 // Maximum 10 files
     },
-    filename: function (req, file, cb) {
-      const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-      cb(null, uniqueSuffix + "-" + file.originalname.replace(/\s+/g, "_"));
-    },
+    fileFilter: (req, file, cb) => {
+      // Check file type
+      if (file.mimetype.startsWith('image/')) {
+        cb(null, true);
+      } else {
+        cb(new Error('Only image files are allowed'));
+      }
+    }
   });
-  const productImageUpload = multer({ storage: productImageStorage });
 
   // Add product with multiple images
   app.post("/api/products", productImageUpload.array("images", 10), async (req, res) => {
     try {
+      const db = await getDb();
       const data = req.body;
-      // Create product first
-      const product = await prisma.product.create({
-        data: {
-          name: data.name,
-          category: data.category,
-          subcategory: data.subcategory,
-          shortDescription: data.shortDescription,
-          fullTechnicalInfo: data.fullTechnicalInfo,
-          specifications: data.specifications,
-          featuresBenefits: data.featuresBenefits,
-          applications: data.applications,
-          certifications: data.certifications,
-          technicalDetails: data.technicalDetails,
-          catalogPdfUrl: data.catalogPdfUrl,
-          datasheetPdfUrl: data.datasheetPdfUrl,
-          homeFeatured: data.homeFeatured === "true" || data.homeFeatured === true,
-        },
-      });
+      data.createdAt = new Date();
+      // Save product
+      const result = await db.collection('Product').insertOne(data);
+      const productId = result.insertedId;
       // Save images if any
       if (req.files && Array.isArray(req.files)) {
         for (const file of req.files) {
-          await prisma.productImage.create({
-            data: {
-              productId: product.id,
-              url: `/uploads/products/${file.filename}`,
-            },
+          await db.collection('ProductImage').insertOne({
+            productId,
+            url: `/uploads/products/${file.filename}`,
+            uploadedAt: new Date()
           });
         }
       }
       // Return product with images
-      const productWithImages = await prisma.product.findUnique({
-        where: { id: product.id },
-        include: { images: true },
-      });
-      res.status(201).json(productWithImages);
+      const productWithImages = await db.collection('Product').findOne({ _id: productId });
+      if (productWithImages) {
+        const images = await db.collection('ProductImage').find({ productId }).toArray();
+        productWithImages.images = images;
+        res.status(201).json(productWithImages);
+      } else {
+        res.status(404).json({ message: "Product not found after creation" });
+      }
     } catch (err: any) {
       res.status(500).json({ message: "Failed to add product", error: err.message });
     }
@@ -300,14 +365,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Edit product with multiple images
   app.put("/api/products/:id", productImageUpload.array("images", 10), async (req, res) => {
     try {
-      const id = Number(req.params.id);
+      const idParam = req.params.id;
       const data = req.body;
-      
-      // Handle existing images - remove images that are no longer in the list
+      const db = await getDb();
+
+      // Build product query supporting both ObjectId and numeric id
+      let productQuery: any;
+      if (ObjectId.isValid(idParam) && idParam.length === 24) {
+        productQuery = { _id: new ObjectId(idParam) };
+      } else {
+        const idNum = Number(idParam);
+        if (Number.isNaN(idNum)) {
+          return res.status(400).json({ message: "Invalid product ID" });
+        }
+        productQuery = { id: idNum };
+      }
+
+      const product = await db.collection('Product').findOne(productQuery);
+      if (!product) {
+        return res.status(404).json({ message: 'Product not found' });
+      }
+
+      // Handle existing images removal
+      let existingImageUrls: string[] | null = null;
       if (data.existingImages) {
-        let existingImageUrls: string[] = [];
         if (Array.isArray(data.existingImages)) {
-          existingImageUrls = data.existingImages;
+          existingImageUrls = data.existingImages as string[];
         } else if (typeof data.existingImages === 'string') {
           try {
             existingImageUrls = JSON.parse(data.existingImages);
@@ -315,63 +398,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
             existingImageUrls = [];
           }
         }
-        // Get current images for this product
-        const currentImages = await prisma.productImage.findMany({
-          where: { productId: id }
-        });
-        
-        // Remove images that are no longer in the existingImages list
-        for (const currentImage of currentImages) {
-          if (!existingImageUrls.includes(currentImage.url)) {
-            await prisma.productImage.delete({
-              where: { id: currentImage.id }
-            });
-          }
-        }
-      } else {
-        // If no existingImages provided, remove all current images
-        await prisma.productImage.deleteMany({
-          where: { productId: id }
-        });
       }
       
+      console.log("PUT /api/products/:id - existingImageUrls:", existingImageUrls);
+      console.log("PUT /api/products/:id - req.files:", req.files);
+
+      const imageFindQuery: any = { $or: [] as any[] };
+      if (product._id) imageFindQuery.$or.push({ productId: product._id });
+      if (typeof product.id === 'number') imageFindQuery.$or.push({ productId: product.id });
+      if (imageFindQuery.$or.length > 0) {
+        const currentImages = await db.collection('ProductImage').find(imageFindQuery).toArray();
+        console.log("PUT /api/products/:id - currentImages in DB:", currentImages);
+        
+        if (existingImageUrls) {
+          console.log("PUT /api/products/:id - Keeping images:", existingImageUrls);
+          for (const currentImage of currentImages) {
+            console.log(`PUT /api/products/:id - Checking image: ${currentImage.url} - Keep: ${existingImageUrls.includes(currentImage.url)}`);
+            if (!existingImageUrls.includes(currentImage.url)) {
+              console.log(`PUT /api/products/:id - Deleting image: ${currentImage.url}`);
+              await db.collection('ProductImage').deleteOne({ _id: currentImage._id });
+            }
+          }
+        } else {
+          console.log("PUT /api/products/:id - No existing images specified, deleting all");
+          await db.collection('ProductImage').deleteMany(imageFindQuery);
+        }
+      }
+
       // Update product fields
-      const product = await prisma.product.update({
-        where: { id },
-        data: {
-          name: data.name,
-          category: data.category,
-          subcategory: data.subcategory,
-          shortDescription: data.shortDescription,
-          fullTechnicalInfo: data.fullTechnicalInfo,
-          specifications: data.specifications,
-          featuresBenefits: data.featuresBenefits,
-          applications: data.applications,
-          certifications: data.certifications,
-          technicalDetails: data.technicalDetails,
-          catalogPdfUrl: data.catalogPdfUrl,
-          datasheetPdfUrl: data.datasheetPdfUrl,
-          homeFeatured: data.homeFeatured === "true" || data.homeFeatured === true,
-        },
-      });
-      
+      await db.collection('Product').updateOne(productQuery, { $set: data });
+
       // Save new images if any
       if (req.files && Array.isArray(req.files)) {
-        for (const file of req.files) {
-          await prisma.productImage.create({
-            data: {
-              productId: product.id,
-              url: `/uploads/products/${file.filename}`,
-            },
-          });
+        console.log("PUT /api/products/:id - Saving new images:", req.files.map(f => f.filename));
+        for (const file of req.files as Express.Multer.File[]) {
+          const imageDoc = {
+            productId: product._id ?? product.id,
+            url: `/uploads/products/${file.filename}`,
+            uploadedAt: new Date()
+          };
+          console.log("PUT /api/products/:id - Inserting image:", imageDoc);
+          await db.collection('ProductImage').insertOne(imageDoc);
         }
+      } else {
+        console.log("PUT /api/products/:id - No new images to save");
       }
-      
+
       // Return product with images
-      const productWithImages = await prisma.product.findUnique({
-        where: { id: product.id },
-        include: { images: true },
-      });
+      const productWithImages: any = await db.collection('Product').findOne(productQuery);
+      if (!productWithImages) {
+        return res.status(404).json({ message: "Product not found after update" });
+      }
+      const refreshedImages = imageFindQuery.$or.length > 0
+        ? await db.collection('ProductImage').find(imageFindQuery).toArray()
+        : [];
+      productWithImages.images = refreshedImages;
+      if (productWithImages.id === undefined || productWithImages.id === null) {
+        productWithImages.id = String(productWithImages._id);
+      }
       res.json(productWithImages);
     } catch (err: any) {
       res.status(500).json({ message: "Failed to update product", error: err.message });
@@ -381,16 +465,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/products/:id", async (req: Request, res: Response) => {
     try {
       // In production, verify JWT token here
-      const id = parseInt(req.params.id);
-      if (isNaN(id)) {
-        return res.status(400).json({ message: "Invalid product ID" });
+      const idParam = req.params.id;
+      const db = await getDb();
+
+      let productQuery: any;
+      if (ObjectId.isValid(idParam) && idParam.length === 24) {
+        productQuery = { _id: new ObjectId(idParam) };
+      } else {
+        const idNum = Number(idParam);
+        if (Number.isNaN(idNum)) {
+          return res.status(400).json({ message: "Invalid product ID" });
+        }
+        productQuery = { id: idNum };
       }
 
-      const deleted = await prisma.product.delete({
-        where: { id },
-      });
-      if (!deleted) {
+      const product = await db.collection('Product').findOne(productQuery);
+      if (!product) {
         return res.status(404).json({ message: "Product not found" });
+      }
+
+      await db.collection('Product').deleteOne(productQuery);
+      // Clean up related images
+      const imageDeleteQuery: any = { $or: [] as any[] };
+      if (product._id) imageDeleteQuery.$or.push({ productId: product._id });
+      if (typeof product.id === 'number') imageDeleteQuery.$or.push({ productId: product.id });
+      if (imageDeleteQuery.$or.length > 0) {
+        await db.collection('ProductImage').deleteMany(imageDeleteQuery);
       }
 
       res.json({ message: "Product deleted successfully" });
@@ -418,11 +518,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         // Use the partial schema for validation
         const validatedData = updateProductSchema.parse({ rank });
-        const updated = await prisma.product.update({
-          where: { id },
-          data: validatedData,
-        });
-        if (updated) results.push(updated);
+        const db = await getDb();
+        const updated = await db.collection('Product').updateOne({ id }, { $set: validatedData });
+        if (updated.modifiedCount) results.push({ id, rank });
         else {
           console.warn('Product not found for update:', id);
           skipped.push({ id, rank, reason: 'Product not found' });
@@ -442,22 +540,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Category routes (moved up)
   app.get('/api/categories', async (req, res) => {
     try {
-      // Fetch categories with nested subcategories (tree)
-      const categories = await prisma.category.findMany({
-        include: {
-          subcategories: {
-            where: { parentId: null },
-            include: {
-              children: {
-                include: {
-                  children: true // up to 2 levels deep, can be made recursive in frontend
-                }
-              }
-            }
+      const db = await getDb();
+      // Fetch all categories
+      const categories = await db.collection('Category').find({}).toArray();
+      // Fetch all subcategories
+      const subcategories = await db.collection('Subcategory').find({}).toArray();
+      // Build tree structure
+      const categoryMap: { [key: string]: any } = {};
+      categories.forEach((cat: any) => {
+        cat.subcategories = [];
+        categoryMap[cat.id] = cat;
+      });
+      subcategories.forEach((sub: any) => {
+        if (sub.parentId) {
+          // Nested subcategory
+          const parent = subcategories.find((s: any) => s.id === sub.parentId);
+          if (parent) {
+            parent.children = parent.children || [];
+            parent.children.push(sub);
           }
+        } else if (sub.categoryId && categoryMap[sub.categoryId]) {
+          // Top-level subcategory
+          (categoryMap[sub.categoryId] as any).subcategories.push(sub);
         }
       });
-      res.json(categories);
+      res.json(Object.values(categoryMap));
     } catch (error) {
       console.error('Error fetching categories:', error);
       res.status(500).json({ error: 'Failed to fetch categories' });
@@ -470,41 +577,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!name) {
         return res.status(400).json({ error: 'Invalid category data' });
       }
-      // Recursive function to create nested subcategories
-      async function createSubcategories(subs, categoryId, parentId = null) {
+      const db = await getDb();
+      const newCategory = await db.collection('Category').insertOne({ name });
+      const categoryId = newCategory.insertedId;
+
+      const createSubcategories = async (subs: any[], categoryId: any, parentId: any = null) => {
         for (const sub of subs) {
-          const created = await prisma.subcategory.create({
-            data: {
-              name: sub.name,
-              categoryId,
-              parentId,
-            },
+          const created = await db.collection('Subcategory').insertOne({
+            name: sub.name,
+            categoryId,
+            parentId,
           });
           if (sub.children && sub.children.length > 0) {
-            await createSubcategories(sub.children, categoryId, created.id);
+            await createSubcategories(sub.children, categoryId, created.insertedId);
           }
         }
-      }
-      const newCategory = await prisma.category.create({
-        data: { name },
-      });
+      };
+
       if (Array.isArray(subcategories)) {
-        await createSubcategories(subcategories, newCategory.id);
+        await createSubcategories(subcategories, categoryId);
       }
-      // Fetch with tree for response
-      const categoryWithTree = await prisma.category.findUnique({
-        where: { id: newCategory.id },
-        include: {
-          subcategories: {
-            where: { parentId: null },
-            include: {
-              children: {
-                include: { children: true }
-              }
-            }
-          }
-        }
-      });
+      const categoryWithTree = await db.collection('Category').findOne({ _id: categoryId });
       res.status(201).json(categoryWithTree);
     } catch (error) {
       console.error('Error creating category:', error);
@@ -519,44 +612,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!name) {
         return res.status(400).json({ error: 'Invalid category data' });
       }
-      // Delete all subcategories for this category (cascade will handle children)
-      await prisma.subcategory.deleteMany({ where: { categoryId: id } });
-      // Recursive function to create nested subcategories
-      async function createSubcategories(subs, categoryId, parentId = null) {
+      const db = await getDb();
+      await db.collection('Subcategory').deleteMany({ categoryId: new ObjectId(id) });
+
+      const createSubcategories = async (subs: any[], categoryId: any, parentId: any = null) => {
         for (const sub of subs) {
-          const created = await prisma.subcategory.create({
-            data: {
-              name: sub.name,
-              categoryId,
-              parentId,
-            },
+          const created = await db.collection('Subcategory').insertOne({
+            name: sub.name,
+            categoryId,
+            parentId,
           });
           if (sub.children && sub.children.length > 0) {
-            await createSubcategories(sub.children, categoryId, created.id);
+            await createSubcategories(sub.children, categoryId, created.insertedId);
           }
         }
-      }
-      await prisma.category.update({
-        where: { id },
-        data: { name },
-      });
+      };
+
+      await db.collection('Category').updateOne({ _id: new ObjectId(id) }, { $set: { name } });
       if (Array.isArray(subcategories)) {
-        await createSubcategories(subcategories, id);
+        await createSubcategories(subcategories, new ObjectId(id));
       }
-      // Fetch with tree for response
-      const categoryWithTree = await prisma.category.findUnique({
-        where: { id },
-        include: {
-          subcategories: {
-            where: { parentId: null },
-            include: {
-              children: {
-                include: { children: true }
-              }
-            }
-          }
-        }
-      });
+      const categoryWithTree = await db.collection('Category').findOne({ _id: new ObjectId(id) });
       res.json(categoryWithTree);
     } catch (error) {
       console.error('Error updating category:', error);
@@ -566,15 +642,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete('/api/categories/:id', async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
-      const success = await prisma.category.delete({
-        where: { id },
-      });
-      
-      if (!success) {
+      const id = req.params.id;
+      const db = await getDb();
+      const result = await db.collection('Category').deleteOne({ _id: new ObjectId(id) });
+
+      if (result.deletedCount === 0) {
         return res.status(404).json({ error: 'Category not found' });
       }
-      
+
       res.json({ message: 'Category deleted successfully' });
     } catch (error) {
       console.error('Error deleting category:', error);
@@ -591,22 +666,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         body.products = JSON.stringify(body.products);
       }
       const quoteData = insertQuoteRequestSchema.parse(body);
-      const quote = await prisma.quoteRequest.create({
-        data: quoteData,
-      });
-      // Try to send notifications, but don't fail the request if they error
-      const quoteBody = `New Quote Request:\n${JSON.stringify(quote, null, 2)}`;
-      try {
-      await sendAdminEmail('New Quote Request', quoteBody);
-      } catch (emailErr) {
-        console.error('Failed to send admin email:', emailErr);
+      const db = await getDb();
+      const result = await db.collection('QuoteRequest').insertOne(quoteData);
+      const quote = await db.collection('QuoteRequest').findOne({ _id: result.insertedId });
+      if (quote) {
+        // Try to send notifications, but don't fail the request if they error
+        const quoteBody = `New Quote Request:\n${JSON.stringify(quote, null, 2)}`;
+        try {
+          await sendAdminEmail('New Quote Request', quoteBody);
+        } catch (emailErr) {
+          console.error('Failed to send admin email:', emailErr);
+        }
+        try {
+          await sendAdminWhatsApp(quoteBody);
+        } catch (waErr) {
+          console.error('Failed to send WhatsApp notification:', waErr);
+        }
+        res.status(201).json({ message: "Quote request submitted successfully", id: quote._id });
+      } else {
+        res.status(404).json({ message: "Quote not found after creation" });
       }
-      try {
-      await sendAdminWhatsApp(quoteBody);
-      } catch (waErr) {
-        console.error('Failed to send WhatsApp notification:', waErr);
-      }
-      res.status(201).json({ message: "Quote request submitted successfully", id: quote.id });
     } catch (error) {
       console.error("Quote creation error:", error);
       res.status(400).json({ 
@@ -619,7 +698,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/quotes", async (req: Request, res: Response) => {
     try {
       // In production, verify JWT token here
-      const quotes = await prisma.quoteRequest.findMany();
+      const db = await getDb();
+      const quotes = await db.collection('QuoteRequest').find({}).toArray();
       res.json(quotes);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch quotes" });
@@ -635,14 +715,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (isNaN(id) || !['New', 'Contacted', 'Closed'].includes(status)) {
         return res.status(400).json({ message: "Invalid data" });
       }
+      const db = await getDb();
+      const result = await db.collection('QuoteRequest').updateOne({ _id: new ObjectId(id) }, { $set: { status } });
 
-      const quote = await prisma.quoteRequest.update({
-        where: { id },
-        data: { status },
-      });
-      if (!quote) {
+      if (result.modifiedCount === 0) {
         return res.status(404).json({ message: "Quote not found" });
       }
+      const quote = await db.collection('QuoteRequest').findOne({ _id: new ObjectId(id) });
 
       res.json(quote);
     } catch (error) {
@@ -655,20 +734,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log("/api/messages received:", req.body); // DEBUG LOG
       console.log("Using schema:", insertContactMessageSchema); // DEBUG: Log the schema being used
-      const messageData = insertContactMessageSchema.parse(req.body);
-      console.log("Parsed data:", messageData); // DEBUG: Log the parsed data
-      // Remove phone before saving to DB
-      const { phone, ...dbData } = messageData;
-      const message = await prisma.contactMessage.create({
-        data: dbData,
-      });
-      
-      // In production, send email notification here using Nodemailer
-      const messageBody = `New Contact Message:\n${JSON.stringify(message, null, 2)}`;
-      await sendAdminEmail('New Contact Message', messageBody);
-      // await sendAdminWhatsApp(messageBody); // Disabled to fix Twilio username error
-      
-      res.status(201).json({ message: "Message sent successfully", id: message.id });
+  const db = await getDb();
+  const messageData = insertContactMessageSchema.parse(req.body);
+  console.log("Parsed data:", messageData); // DEBUG: Log the parsed data
+  // Remove phone before saving to DB
+  const { phone, ...dbData } = messageData;
+  const result = await db.collection('ContactMessage').insertOne(dbData);
+  const message = await db.collection('ContactMessage').findOne({ _id: result.insertedId });
+  if (message) {
+    // In production, send email notification here using Nodemailer
+    const messageBody = `New Contact Message:\n${JSON.stringify(message, null, 2)}`;
+    await sendAdminEmail('New Contact Message', messageBody);
+    res.status(201).json({ message: "Message sent successfully", id: message._id });
+  } else {
+    res.status(404).json({ message: "Message not found after creation" });
+  }
     } catch (error) {
       console.log("Error details:", error); // DEBUG: Log the full error
       res.status(400).json({ message: "Invalid message data", details: error instanceof Error ? error.message : error });
@@ -678,8 +758,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/messages", async (req: Request, res: Response) => {
     try {
       // In production, verify JWT token here
-      const messages = await prisma.contactMessage.findMany();
-      res.json(messages);
+  const db = await getDb();
+  const messages = await db.collection('ContactMessage').find({}).toArray();
+  res.json(messages);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch messages" });
     }
@@ -688,21 +769,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/messages/:id/replied", async (req: Request, res: Response) => {
     try {
       // In production, verify JWT token here
+      const db = await getDb();
       const id = parseInt(req.params.id);
       const { replied } = req.body;
-      
       if (isNaN(id) || typeof replied !== 'boolean') {
         return res.status(400).json({ message: "Invalid data" });
       }
-
-      const message = await prisma.contactMessage.update({
-        where: { id },
-        data: { replied },
-      });
-      if (!message) {
+      const result = await db.collection('ContactMessage').updateOne({ id }, { $set: { replied } });
+      if (!result.modifiedCount) {
         return res.status(404).json({ message: "Message not found" });
       }
-
+      const message = await db.collection('ContactMessage').findOne({ id });
       res.json(message);
     } catch (error) {
       res.status(500).json({ message: "Failed to update message status" });
@@ -713,13 +790,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/analytics/website-views", async (req: Request, res: Response) => {
     try {
       // In production, verify JWT token here
-      const views = await prisma.websiteView.findMany({
-        select: {
-          ip: true,
-          createdAt: true,
-        },
-      });
-      res.json({ totalViews: views.length });
+  const db = await getDb();
+  const views = await db.collection('WebsiteView').find({}, { projection: { ip: 1, createdAt: 1 } }).toArray();
+  res.json({ totalViews: views.length });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch website views" });
     }
@@ -727,11 +800,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/analytics/website-views", async (req: Request, res: Response) => {
     try {
-      const ip = req.ip || req.connection.remoteAddress;
-      await prisma.websiteView.create({
-        data: { ip },
-      });
-      res.json({ message: "View recorded" });
+  const db = await getDb();
+  const ip = req.ip || req.connection.remoteAddress;
+  await db.collection('WebsiteView').insertOne({ ip, createdAt: new Date() });
+  res.json({ message: "View recorded" });
     } catch (error) {
       res.status(500).json({ message: "Failed to record view" });
     }
@@ -740,8 +812,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/analytics/product-views", async (req: Request, res: Response) => {
     try {
       // In production, verify JWT token here
-      const productViews = await prisma.productView.findMany();
-      res.json(productViews);
+  const db = await getDb();
+  const productViews = await db.collection('ProductView').find({}).toArray();
+  res.json(productViews);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch product views" });
     }
@@ -750,8 +823,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Company Events routes
   app.get("/api/events", async (req: Request, res: Response) => {
     try {
-      const events = await prisma.companyEvent.findMany();
-      res.json(events);
+  const db = await getDb();
+  const events = await db.collection('CompanyEvent').find({}).toArray();
+  res.json(events);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch events" });
     }
@@ -764,13 +838,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid event ID" });
       }
 
-      const event = await prisma.companyEvent.findUnique({
-        where: { id },
-      });
+      const db = await getDb();
+      const event = await db.collection('CompanyEvent').findOne({ id });
       if (!event) {
         return res.status(404).json({ message: "Event not found" });
       }
-      
       res.json(event);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch event" });
@@ -780,6 +852,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/events", async (req: Request, res: Response) => {
     try {
       // In production, verify JWT token here
+      const db = await getDb();
       const raw = { ...req.body } as any;
       const sanitized = Object.fromEntries(
         Object.entries(raw).map(([k, v]) => [k, (v === "" || v === null) ? undefined : v])
@@ -788,9 +861,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...sanitized,
         eventDate: new Date(raw.eventDate),
       });
-      const event = await prisma.companyEvent.create({
-        data: eventData,
-      });
+      const result = await db.collection('CompanyEvent').insertOne(eventData);
+      const event = await db.collection('CompanyEvent').findOne({ _id: result.insertedId });
       res.status(201).json(event);
     } catch (error) {
       console.error("Event creation error:", error);
@@ -817,15 +889,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...sanitized,
         eventDate: raw.eventDate ? new Date(raw.eventDate) : undefined,
       });
-      const event = await prisma.companyEvent.update({
-        where: { id },
-        data: eventData,
-      });
-      
-      if (!event) {
+      const db = await getDb();
+      const result = await db.collection('CompanyEvent').updateOne({ id }, { $set: eventData });
+      if (!result.modifiedCount) {
         return res.status(404).json({ message: "Event not found" });
       }
-
+      const event = await db.collection('CompanyEvent').findOne({ id });
       res.json(event);
     } catch (error) {
       console.error("Event update error:", error);
@@ -845,13 +914,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid event ID" });
       }
 
-      const deleted = await prisma.companyEvent.delete({
-        where: { id },
-      });
-      if (!deleted) {
+      const db = await getDb();
+      const deleted = await db.collection('CompanyEvent').deleteOne({ id });
+      if (!deleted.deletedCount) {
         return res.status(404).json({ message: "Event not found" });
       }
-
       res.json({ message: "Event deleted successfully" });
     } catch (error) {
       res.status(500).json({ message: "Failed to delete event" });
@@ -861,7 +928,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Catalog routes
   app.get("/api/catalog/main-catalog", async (req: Request, res: Response) => {
     try {
-      const catalogInfo = await prisma.mainCatalog.findFirst();
+      const db = await getDb();
+      const catalogInfo = await db.collection('MainCatalog').findOne({});
       if (!catalogInfo || !catalogInfo.pdfUrl) {
         return res.status(404).json({ message: "Main catalog not found" });
       }
@@ -938,20 +1006,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Handle JSON body
         catalogData = req.body;
       }
+      const db = await getDb();
       const validated = insertMainCatalogSchema.parse(catalogData);
-      // Only save fields that exist in the Prisma model
       const dbData = {
         title: validated.title,
         description: validated.description,
-        pdfUrl: validated.pdfUrl
+        pdfUrl: validated.pdfUrl,
+        fileSize: validated.fileSize
       };
-      const catalog = await prisma.mainCatalog.upsert({
-        where: { id: 1 },
-        create: dbData,
-        update: dbData,
-      });
-      // Respond with fileSize if present, for UI
-      res.json({ ...catalog, fileSize: validated.fileSize });
+      // Upsert logic for MongoDB
+      const result = await db.collection('MainCatalog').updateOne({}, { $set: dbData }, { upsert: true });
+      const catalog = await db.collection('MainCatalog').findOne({});
+      res.json(catalog);
     } catch (error) {
       console.error('Catalog update error:', error);
       res.status(400).json({ 
@@ -964,8 +1030,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Customer routes
   app.get("/api/customers", async (req: Request, res: Response) => {
     try {
-      const customers = await prisma.customer.findMany();
-      res.json(customers);
+  const db = await getDb();
+  const customers = await db.collection('Customer').find({}).toArray();
+  res.json(customers);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch customers" });
     }
@@ -978,13 +1045,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid customer ID" });
       }
 
-      const customer = await prisma.customer.findUnique({
-        where: { id },
-      });
+      const db = await getDb();
+      const customer = await db.collection('Customer').findOne({ id });
       if (!customer) {
         return res.status(404).json({ message: "Customer not found" });
       }
-      
       res.json(customer);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch customer" });
@@ -994,11 +1059,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/customers", async (req: Request, res: Response) => {
     try {
       // In production, verify JWT token here
-      const customerData = insertCustomerSchema.parse(req.body);
-      const customer = await prisma.customer.create({
-        data: customerData,
-      });
-      res.status(201).json(customer);
+  const db = await getDb();
+  const customerData = insertCustomerSchema.parse(req.body);
+  const result = await db.collection('Customer').insertOne(customerData);
+  const customer = await db.collection('Customer').findOne({ _id: result.insertedId });
+  res.status(201).json(customer);
     } catch (error) {
       console.error("Customer creation error:", error);
       res.status(400).json({ 
@@ -1016,16 +1081,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid customer ID" });
       }
 
+      const db = await getDb();
       const customerData = insertCustomerSchema.partial().parse(req.body);
-      const customer = await prisma.customer.update({
-        where: { id },
-        data: customerData,
-      });
-      
-      if (!customer) {
+      const result = await db.collection('Customer').updateOne({ id }, { $set: customerData });
+      if (!result.modifiedCount) {
         return res.status(404).json({ message: "Customer not found" });
       }
-
+      const customer = await db.collection('Customer').findOne({ id });
       res.json(customer);
     } catch (error) {
       res.status(400).json({ message: "Invalid customer data" });
@@ -1040,13 +1102,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid customer ID" });
       }
 
-      const deleted = await prisma.customer.delete({
-        where: { id },
-      });
-      if (!deleted) {
+      const db = await getDb();
+      const deleted = await db.collection('Customer').deleteOne({ id });
+      if (!deleted.deletedCount) {
         return res.status(404).json({ message: "Customer not found" });
       }
-
       res.json({ message: "Customer deleted successfully" });
     } catch (error) {
       res.status(500).json({ message: "Failed to delete customer" });
@@ -1056,8 +1116,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Industry routes
   app.get("/api/industries", async (req: Request, res: Response) => {
     try {
-      const industries = await prisma.industry.findMany({ orderBy: { rank: "asc" } });
-      res.json(industries);
+  const db = await getDb();
+  const industries = await db.collection('Industry').find({}).sort({ rank: 1 }).toArray();
+  res.json(industries);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch industries" });
     }
@@ -1065,11 +1126,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/industries", async (req: Request, res: Response) => {
     try {
-      const { name, description, icon, rank } = req.body;
-      const industry = await prisma.industry.create({
-        data: { name, description, icon, rank: rank ?? 0 },
-      });
-      res.status(201).json(industry);
+  const db = await getDb();
+  const { name, description, icon, rank } = req.body;
+  const result = await db.collection('Industry').insertOne({ name, description, icon, rank: rank ?? 0 });
+  const industry = await db.collection('Industry').findOne({ _id: result.insertedId });
+  res.status(201).json(industry);
     } catch (error) {
       res.status(400).json({ message: "Failed to create industry", details: error instanceof Error ? error.message : error });
     }
@@ -1077,12 +1138,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/industries/:id", async (req: Request, res: Response) => {
     try {
+      const db = await getDb();
       const id = parseInt(req.params.id);
       const { name, description, icon, rank } = req.body;
-      const industry = await prisma.industry.update({
-        where: { id },
-        data: { name, description, icon, rank },
-      });
+      const result = await db.collection('Industry').updateOne({ id }, { $set: { name, description, icon, rank } });
+      if (!result.modifiedCount) {
+        return res.status(404).json({ message: "Industry not found" });
+      }
+      const industry = await db.collection('Industry').findOne({ id });
       res.json(industry);
     } catch (error) {
       res.status(400).json({ message: "Failed to update industry", details: error instanceof Error ? error.message : error });
@@ -1091,8 +1154,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/industries/:id", async (req: Request, res: Response) => {
     try {
+      const db = await getDb();
       const id = parseInt(req.params.id);
-      await prisma.industry.delete({ where: { id } });
+      const deleted = await db.collection('Industry').deleteOne({ id });
+      if (!deleted.deletedCount) {
+        return res.status(404).json({ message: "Industry not found" });
+      }
       res.json({ message: "Industry deleted successfully" });
     } catch (error) {
       res.status(400).json({ message: "Failed to delete industry", details: error instanceof Error ? error.message : error });
@@ -1109,18 +1176,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // List all jobs
   app.get('/api/jobs', async (req, res) => {
-    const jobs = await prisma.job.findMany();
-    res.json(jobs);
+  const db = await getDb();
+  const jobs = await db.collection('Job').find({}).toArray();
+  res.json(jobs);
   });
 
   // Create a new job (admin)
   app.post('/api/jobs', async (req, res) => {
     try {
-      const jobData = insertJobSchema.parse(req.body);
-      const job = await prisma.job.create({
-        data: jobData,
-      });
-      res.status(201).json(job);
+  const db = await getDb();
+  const jobData = insertJobSchema.parse(req.body);
+  const result = await db.collection('Job').insertOne(jobData);
+  const job = await db.collection('Job').findOne({ _id: result.insertedId });
+  res.status(201).json(job);
     } catch (error) {
       res.status(400).json({ message: 'Invalid job data' });
     }
@@ -1128,31 +1196,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Delete a job (admin)
   app.delete('/api/jobs/:id', async (req, res) => {
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: 'Invalid job ID' });
-    const deleted = await prisma.job.delete({
-      where: { id },
-    });
-    if (!deleted) return res.status(404).json({ message: 'Job not found' });
-    res.json({ message: 'Job deleted' });
+  const db = await getDb();
+  const id = parseInt(req.params.id);
+  if (isNaN(id)) return res.status(400).json({ message: 'Invalid job ID' });
+  const deleted = await db.collection('Job').deleteOne({ id });
+  if (!deleted.deletedCount) return res.status(404).json({ message: 'Job not found' });
+  res.json({ message: 'Job deleted' });
   });
 
   // Submit a job application (with resume upload)
   app.post('/api/apply', upload.single('resume'), async (req, res) => {
     try {
+      const db = await getDb();
       const { name, email, location, experience, jobId } = req.body;
-      const job = await prisma.job.findUnique({
-        where: { id: Number(jobId) },
-      });
+      const job = await db.collection('Job').findOne({ id: Number(jobId) });
       if (!job) return res.status(400).json({ message: 'Invalid job' });
       if (!req.file) return res.status(400).json({ message: 'Resume required' });
       const resumeUrl = `/uploads/resumes/${req.file.filename}`;
       const appData = insertJobApplicationSchema.parse({
         name, email, location, experience, resumeUrl, jobId: Number(jobId), jobTitle: job.title
       });
-      const application = await prisma.jobApplication.create({
-        data: appData,
-      });
+      const result = await db.collection('JobApplication').insertOne(appData);
+      const application = await db.collection('JobApplication').findOne({ _id: result.insertedId });
       res.status(201).json(application);
     } catch (error) {
       res.status(400).json({ message: 'Invalid application data' });
@@ -1161,8 +1226,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // List all job applications (admin)
   app.get('/api/applications', async (req, res) => {
-    const applications = await prisma.jobApplication.findMany();
-    res.json(applications);
+  const db = await getDb();
+  const applications = await db.collection('JobApplication').find({}).toArray();
+  res.json(applications);
   });
 
   // Serve uploaded resumes statically
@@ -1199,18 +1265,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // GET /api/gallery?section=premises|events|others
   app.get("/api/gallery", async (req, res) => {
-    const section = req.query.section as string;
-    if (!section) return res.status(400).json({ message: "Section is required" });
-    const images = await prisma.galleryImage.findMany({
-      where: { section },
-      orderBy: { uploadedAt: "desc" },
-    });
-    res.json(images);
+  const db = await getDb();
+  const section = req.query.section as string;
+  if (!section) return res.status(400).json({ message: "Section is required" });
+  const images = await db.collection('GalleryImage').find({ section }).sort({ uploadedAt: -1 }).toArray();
+  res.json(images);
   });
 
   // POST /api/gallery (multipart/form-data for file, or JSON for URL)
   app.post("/api/gallery", galleryUpload.single("image"), async (req, res) => {
     try {
+      const db = await getDb();
       const section = req.body.section;
       if (!section) return res.status(400).json({ message: "Section is required" });
       let url = req.body.url;
@@ -1218,9 +1283,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         url = `/uploads/gallery/${req.file.filename}`;
       }
       if (!url) return res.status(400).json({ message: "Image file or URL is required" });
-      const image = await prisma.galleryImage.create({
-        data: { section, url },
-      });
+      const result = await db.collection('GalleryImage').insertOne({ section, url, uploadedAt: new Date() });
+      const image = await db.collection('GalleryImage').findOne({ _id: result.insertedId });
       res.status(201).json(image);
     } catch (err: any) {
       res.status(500).json({ message: "Failed to add image", error: err.message });
@@ -1229,11 +1293,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // DELETE /api/gallery/:id
   app.delete("/api/gallery/:id", async (req, res) => {
+    const db = await getDb();
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ message: "Invalid ID" });
     try {
-      const image = await prisma.galleryImage.delete({ where: { id } });
-      res.json({ message: "Image deleted", image });
+      const image = await db.collection('GalleryImage').findOneAndDelete({ id: new ObjectId(id) });
+      if (!image) return res.status(404).json({ message: "Image not found" });
+      res.json({ message: "Image deleted", image: image });
     } catch (err: any) {
       res.status(404).json({ message: "Image not found" });
     }
@@ -1241,7 +1307,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   router.post("/api/chatbot", async (req, res) => {
     const { message, sessionId } = req.body;
-    const text = message?.toLowerCase() || "";
+    const text = req.body.message?.toLowerCase() || "";
     let reply = "Sorry, I didn't understand that. Can you rephrase or provide more details?";
 
     // Session state
@@ -1308,15 +1374,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Product search endpoint for navbar search bar
   router.get("/api/products", async (req, res) => {
+    const db = await getDb();
     const { search } = req.query;
-    let products = await prisma.product.findMany({
-      include: {
-        images: true,
-      },
-    });
+    let products = await db.collection('Product').find({}).toArray();
+    // Attach images
+    for (const product of products) {
+      product.images = await db.collection('ProductImage').find({ productId: product._id }).toArray();
+    }
     if (search) {
       const s = String(search).toLowerCase();
-      products = products.filter((p: any) => p.name.toLowerCase().includes(s));
+      products = products.filter((p: any) => p.name && p.name.toLowerCase().includes(s));
     }
     res.json(products);
   });
@@ -1360,8 +1427,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/team - list all team members
   app.get('/api/team', async (req, res) => {
     try {
-      const team = await prisma.teamMember.findMany({ orderBy: { createdAt: 'desc' } });
-      res.json(team);
+  const db = await getDb();
+  const team = await db.collection('TeamMember').find({}).sort({ createdAt: -1 }).toArray();
+  res.json(team);
     } catch (error) {
       res.status(500).json({ message: 'Failed to fetch team members' });
     }
@@ -1370,14 +1438,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/team - add new team member (with photo)
   app.post('/api/team', teamUpload.single('photo'), async (req, res) => {
     try {
+      const db = await getDb();
       const { name, role, bio } = req.body;
       let photoUrl = undefined;
       if (req.file) {
         photoUrl = `/uploads/team/${req.file.filename}`;
       }
-      const member = await prisma.teamMember.create({
-        data: { name, role, bio, photoUrl },
-      });
+      const result = await db.collection('TeamMember').insertOne({ name, role, bio, photoUrl, createdAt: new Date() });
+      const member = await db.collection('TeamMember').findOne({ _id: result.insertedId });
       res.status(201).json(member);
     } catch (error) {
       res.status(400).json({ message: 'Failed to add team member' });
@@ -1387,13 +1455,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // PUT /api/team/:id - update team member (with optional new photo)
   app.put('/api/team/:id', teamUpload.single('photo'), async (req, res) => {
     try {
+      const db = await getDb();
       const id = Number(req.params.id);
       const { name, role, bio } = req.body;
       let photoUrl = undefined;
       if (req.file) {
         photoUrl = `/uploads/team/${req.file.filename}`;
         // Delete old photo if exists
-        const old = await prisma.teamMember.findUnique({ where: { id } });
+        const old = await db.collection('TeamMember').findOne({ id });
         if (old && old.photoUrl) {
           const oldPath = path.join(teamUploadsDir, path.basename(old.photoUrl));
           if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
@@ -1401,7 +1470,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const data = { name, role, bio };
       if (photoUrl) Object.assign(data, { photoUrl });
-      const member = await prisma.teamMember.update({ where: { id }, data });
+      const result = await db.collection('TeamMember').updateOne({ id }, { $set: data });
+      if (!result.modifiedCount) {
+        return res.status(404).json({ message: 'Team member not found' });
+      }
+      const member = await db.collection('TeamMember').findOne({ id });
       res.json(member);
     } catch (error) {
       res.status(400).json({ message: 'Failed to update team member' });
@@ -1411,14 +1484,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // DELETE /api/team/:id - delete team member and photo
   app.delete('/api/team/:id', async (req, res) => {
     try {
+      const db = await getDb();
       const id = Number(req.params.id);
-      const member = await prisma.teamMember.findUnique({ where: { id } });
+      const member = await db.collection('TeamMember').findOne({ id });
       if (!member) return res.status(404).json({ message: 'Not found' });
       if (member.photoUrl) {
         const photoPath = path.join(teamUploadsDir, path.basename(member.photoUrl));
         if (fs.existsSync(photoPath)) fs.unlinkSync(photoPath);
       }
-      await prisma.teamMember.delete({ where: { id } });
+      await db.collection('TeamMember').deleteOne({ id });
       res.json({ message: 'Deleted' });
     } catch (error) {
       res.status(400).json({ message: 'Failed to delete team member' });
@@ -1428,4 +1502,3 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
   return httpServer;
 }
-

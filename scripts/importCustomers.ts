@@ -1,6 +1,4 @@
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { getDb } from '../server/mongo.js';
 
 const customers = [
   {
@@ -225,29 +223,28 @@ async function main() {
   console.log('Importing customer companies...\n');
 
   try {
+    const db = await getDb();
+    const customersCollection = db.collection('Customer');
+
     let createdCount = 0;
     let updatedCount = 0;
 
     for (const customer of customers) {
       try {
         // Check if customer already exists
-        const existingCustomer = await prisma.customer.findFirst({
-          where: { name: customer.name }
-        });
+        const existingCustomer = await customersCollection.findOne({ name: customer.name });
 
         if (existingCustomer) {
           // Update existing customer
-          await prisma.customer.update({
-            where: { id: existingCustomer.id },
-            data: customer
-          });
+          await customersCollection.updateOne(
+            { name: customer.name },
+            { $set: customer }
+          );
           updatedCount++;
           console.log(`Updated: ${customer.name}`);
         } else {
           // Create new customer
-          await prisma.customer.create({
-            data: customer
-          });
+          await customersCollection.insertOne(customer);
           createdCount++;
           console.log(`Created: ${customer.name}`);
         }
@@ -263,8 +260,6 @@ async function main() {
 
   } catch (error) {
     console.error('Error during import:', error);
-  } finally {
-    await prisma.$disconnect();
   }
 }
 
@@ -276,4 +271,4 @@ main()
   .catch((error) => {
     console.error('Customer import failed:', error);
     process.exit(1);
-  }); 
+  });

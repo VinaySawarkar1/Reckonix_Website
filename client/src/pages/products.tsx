@@ -71,9 +71,13 @@ export default function Products() {
   const { categories, loading } = useCategories();
   const [location, setLocation] = useLocation();
 
-  const { data: products = [], isLoading } = useQuery<Product[]>({
+  const { data: products = [], isLoading, refetch } = useQuery<Product[]>({
     queryKey: ["/api/products"],
+    refetchOnWindowFocus: true,
+    staleTime: 0, // Always consider data stale
   });
+
+
 
   const safeProducts = Array.isArray(products) ? products : [];
 
@@ -349,6 +353,13 @@ export default function Products() {
                 className="pl-8 h-8 text-sm border-gray-300 rounded w-full"
               />
             </div>
+            <Button 
+              onClick={() => refetch()} 
+              variant="outline" 
+              className="px-4 py-2 h-8 text-sm"
+            >
+              Refresh
+            </Button>
           </div>
         </div>
         {/* Results Summary */}

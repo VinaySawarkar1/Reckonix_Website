@@ -36,57 +36,14 @@ import type { Product, QuoteRequest, ContactMessage } from "../../../../shared/s
 import ProductFormV2 from "./product-form-v2";
 import CategoryManagement from "./category-management";
 import ProductReorder from "./product-reorder";
+import { useCategories } from "../../context/category-context";
 
-// Subcategories mapping for product categories
-const subcategories: Record<string, string[]> = {
-  "Calibration Systems": [
-    "Dimension Calibrators",
-    "Electrical Calibrators",
-    "Thermal Calibrator",
-    "Pressure Calibrator",
-    "Mass and Volume",
-    "Flow Calibrator"
-  ],
-  "Metrology Systems": [
-    "Universal Testing Machines",
-    "Compression Testing Machines",
-    "Tensile Testing Machines",
-    "Hardness Testing Machines",
-    "Impact Testing Machines",
-    "Fatigue Testing Machines",
-    "Torsion Testing Machines",
-    "Spring Testing Machines",
-    "Bend Testing Machines",
-    "Shear Testing Machines",
-    "Peel Testing Machines",
-    "Custom Testing Solutions"
-  ],
-  "Measuring Systems": [
-    "Coordinate Measuring Machines (CMM)",
-    "Optical Measuring Systems",
-    "Laser Measuring Systems",
-    "Digital Calipers",
-    "Digital Micrometers",
-    "Height Gauges",
-    "Surface Roughness Testers",
-    "Profile Projectors",
-    "Toolmakers Microscopes",
-    "Gauge Blocks",
-    "Dial Indicators",
-    "Digital Indicators",
-    "Angle Measuring Instruments",
-    "Thickness Gauges",
-    "Roundness Testers",
-    "Flatness Testers",
-    "Straightness Testers"
-  ],
-  // Add more categories and subcategories as needed
-};
+// Categories will be fetched dynamically from the database
 
 // Define initialProduct outside the component for stable reference
 const initialProduct = {
   name: "",
-  category: "Calibration Systems" as const,
+  category: "",
   subcategory: "",
   shortDescription: "",
   fullTechnicalInfo: "",
@@ -125,6 +82,7 @@ export default function AdminDashboard() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
+  const { categories, loading: categoriesLoading } = useCategories();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
@@ -135,6 +93,86 @@ export default function AdminDashboard() {
   // File upload state
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [editingSelectedFiles, setEditingSelectedFiles] = useState<File[]>([]);
+  
+  // Event file upload state
+  const [eventFiles, setEventFiles] = useState<File[]>([]);
+  const [eventPreviews, setEventPreviews] = useState<string[]>([]);
+  const [editingEventFiles, setEditingEventFiles] = useState<File[]>([]);
+  const [editingEventPreviews, setEditingEventPreviews] = useState<string[]>([]);
+  
+  // Customer file upload state
+  const [customerFiles, setCustomerFiles] = useState<File[]>([]);
+  const [customerPreviews, setCustomerPreviews] = useState<string[]>([]);
+  const [editingCustomerFiles, setEditingCustomerFiles] = useState<File[]>([]);
+  const [editingCustomerPreviews, setEditingCustomerPreviews] = useState<string[]>([]);
+
+  // Event file upload handlers
+  const handleEventFileChange = (e: React.ChangeEvent<HTMLInputElement>, isEditing = false) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      if (isEditing) {
+        setEditingEventFiles(prev => [...prev, ...files]);
+        const newPreviews = files.map(file => URL.createObjectURL(file));
+        setEditingEventPreviews(prev => [...prev, ...newPreviews]);
+      } else {
+        setEventFiles(prev => [...prev, ...files]);
+        const newPreviews = files.map(file => URL.createObjectURL(file));
+        setEventPreviews(prev => [...prev, ...newPreviews]);
+      }
+    }
+  };
+
+  const handleRemoveEventFile = (index: number, isEditing = false) => {
+    if (isEditing) {
+      setEditingEventFiles(prev => prev.filter((_, i) => i !== index));
+      setEditingEventPreviews(prev => {
+        const newPreviews = prev.filter((_, i) => i !== index);
+        URL.revokeObjectURL(prev[index]);
+        return newPreviews;
+      });
+    } else {
+      setEventFiles(prev => prev.filter((_, i) => i !== index));
+      setEventPreviews(prev => {
+        const newPreviews = prev.filter((_, i) => i !== index);
+        URL.revokeObjectURL(prev[index]);
+        return newPreviews;
+      });
+    }
+  };
+
+  // Customer file upload handlers
+  const handleCustomerFileChange = (e: React.ChangeEvent<HTMLInputElement>, isEditing = false) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      if (isEditing) {
+        setEditingCustomerFiles(prev => [...prev, ...files]);
+        const newPreviews = files.map(file => URL.createObjectURL(file));
+        setEditingCustomerPreviews(prev => [...prev, ...newPreviews]);
+      } else {
+        setCustomerFiles(prev => [...prev, ...files]);
+        const newPreviews = files.map(file => URL.createObjectURL(file));
+        setCustomerPreviews(prev => [...prev, ...newPreviews]);
+      }
+    }
+  };
+
+  const handleRemoveCustomerFile = (index: number, isEditing = false) => {
+    if (isEditing) {
+      setEditingCustomerFiles(prev => prev.filter((_, i) => i !== index));
+      setEditingCustomerPreviews(prev => {
+        const newPreviews = prev.filter((_, i) => i !== index);
+        URL.revokeObjectURL(prev[index]);
+        return newPreviews;
+      });
+    } else {
+      setCustomerFiles(prev => prev.filter((_, i) => i !== index));
+      setCustomerPreviews(prev => {
+        const newPreviews = prev.filter((_, i) => i !== index);
+        URL.revokeObjectURL(prev[index]);
+        return newPreviews;
+      });
+    }
+  };
 
   const [showAddEventDialog, setShowAddEventDialog] = useState(false);
   const [editingEvent, setEditingEvent] = useState<any>(null);
@@ -565,7 +603,7 @@ export default function AdminDashboard() {
 
   const resetProductForm = () => {
     dispatchNewProduct({ field: 'name', value: "" });
-    dispatchNewProduct({ field: 'category', value: "Calibration Systems" });
+    dispatchNewProduct({ field: 'category', value: categories.length > 0 ? categories[0].name : "" });
     dispatchNewProduct({ field: 'shortDescription', value: "" });
     dispatchNewProduct({ field: 'fullTechnicalInfo', value: "" });
     dispatchNewProduct({ field: 'specifications', value: [{ key: "", value: "" }] });
@@ -837,7 +875,64 @@ export default function AdminDashboard() {
   };
 
   const handleEditProduct = (product: any) => {
-    setEditingProduct({ ...product });
+    console.log("Editing product:", product);
+    
+    // Ensure all required fields exist with proper defaults
+    const normalizedProduct = {
+      ...product,
+      name: product.name || "",
+      category: product.category || (categories.length > 0 ? categories[0].name : ""),
+      subcategory: product.subcategory || "",
+      shortDescription: product.shortDescription || "",
+      fullTechnicalInfo: product.fullTechnicalInfo || "",
+      specifications: Array.isArray(product.specifications) 
+        ? product.specifications 
+        : (typeof product.specifications === 'string' 
+            ? JSON.parse(product.specifications || '[]') 
+            : [{ key: "", value: "" }]),
+      featuresBenefits: Array.isArray(product.featuresBenefits) 
+        ? product.featuresBenefits 
+        : (typeof product.featuresBenefits === 'string' 
+            ? JSON.parse(product.featuresBenefits || '[]') 
+            : [""]),
+      applications: Array.isArray(product.applications) 
+        ? product.applications 
+        : (typeof product.applications === 'string' 
+            ? JSON.parse(product.applications || '[]') 
+            : [""]),
+      certifications: Array.isArray(product.certifications) 
+        ? product.certifications 
+        : (typeof product.certifications === 'string' 
+            ? JSON.parse(product.certifications || '[]') 
+            : [""]),
+      imageUrl: product.imageUrl || "",
+      // Handle images from ProductImage collection (primary) and fallback to imageGallery
+      images: product.images || [],
+      imageGallery: Array.isArray(product.imageGallery) 
+        ? product.imageGallery 
+        : (typeof product.imageGallery === 'string' 
+            ? JSON.parse(product.imageGallery || '[]') 
+            : []),
+      catalogPdfUrl: product.catalogPdfUrl || "",
+      datasheetPdfUrl: product.datasheetPdfUrl || "",
+      technicalDetails: product.technicalDetails && typeof product.technicalDetails === 'object'
+        ? product.technicalDetails
+        : (typeof product.technicalDetails === 'string' 
+            ? JSON.parse(product.technicalDetails || '{}') 
+            : {
+                dimensions: "",
+                weight: "",
+                powerRequirements: "",
+                operatingConditions: "",
+                warranty: "",
+                compliance: []
+              }),
+      homeFeatured: product.homeFeatured || false,
+      rank: product.rank || 0
+    };
+    
+    console.log("Normalized product:", normalizedProduct);
+    setEditingProduct(normalizedProduct);
     setEditingSelectedFiles([]);
   };
 
@@ -987,11 +1082,15 @@ export default function AdminDashboard() {
   };
 
   const handleAddEvent = () => {
-    const eventData = {
-      ...newEvent,
-      eventDate: newEvent.eventDate
-    };
-    createEvent.mutate(eventData);
+    const formData = new FormData();
+    Object.entries(newEvent).forEach(([key, value]) => {
+      if (key === "imageFiles") return; // skip if any
+      if (value !== undefined && value !== null) {
+        formData.append(key, String(value));
+      }
+    });
+    eventFiles.forEach(file => formData.append("images", file));
+    createEvent.mutate(formData);
   };
 
   const handleEditEvent = (event: any) => {
@@ -999,15 +1098,21 @@ export default function AdminDashboard() {
       ...event,
       eventDate: new Date(event.eventDate).toISOString().split('T')[0]
     });
+    setEditingEventFiles([]);
+    setEditingEventPreviews([]);
   };
 
   const handleUpdateEvent = () => {
     if (editingEvent) {
-      const eventData = {
-        ...editingEvent,
-        eventDate: editingEvent.eventDate
-      };
-      updateEvent.mutate({ id: editingEvent.id, data: eventData });
+      const formData = new FormData();
+      Object.entries(editingEvent).forEach(([key, value]) => {
+        if (key === "imageFiles") return; // skip if any
+        if (value !== undefined && value !== null) {
+          formData.append(key, String(value));
+        }
+      });
+      editingEventFiles.forEach(file => formData.append("images", file));
+      updateEvent.mutate({ id: editingEvent.id, data: formData });
     }
   };
 
@@ -1161,33 +1266,84 @@ export default function AdminDashboard() {
   }
 
   async function handleUpdateProductV2(data: any) {
+    if (!editingProduct) {
+      toast({
+        title: "Error",
+        description: "No product selected for editing",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
+      console.log("handleUpdateProductV2 received data:", data);
+      
       let response;
-      if (data.images && data.images.length > 0) {
-        // Use FormData for file upload
-        const formData = new FormData();
-        Object.entries(data).forEach(([key, value]) => {
-          if (key === "images" && Array.isArray(value)) {
-            value.forEach((file: File) => formData.append("images", file));
-          } else if (key === "existingImages" && Array.isArray(value)) {
-            formData.append(key, JSON.stringify(value));
-          } else if (
-            key === "specifications" ||
-            key === "featuresBenefits" ||
-            key === "applications" ||
-            key === "certifications" ||
-            key === "technicalDetails"
-          ) {
-            formData.append(key, JSON.stringify(value));
-          } else if (value !== undefined && value !== null) {
-            formData.append(key, value);
+      // Check if there are new images (files) to upload
+      // For FormData, we need to check if it has files
+      let hasNewImages = false;
+      if (data instanceof FormData) {
+        // Check if FormData has images (backend expects 'images' field)
+        for (let [key, value] of data.entries()) {
+          if (key === 'images') {
+            hasNewImages = true;
+            break;
           }
-        });
+        }
+      } else {
+        // For regular objects, check the property
+        hasNewImages = data.images && data.images.length > 0;
+      }
+
+      if (hasNewImages) {
+        console.log("Using FormData for file upload");
+        
+        if (data instanceof FormData) {
+          // Data is already FormData, use it directly
+          console.log("FormData contents:");
+          for (let [key, value] of data.entries()) {
+            console.log(`${key}:`, value);
+          }
+          
+          response = await fetch(`/api/products/${editingProduct.id}`, {
+            method: "PUT",
+            body: data,
+          });
+        } else {
+                    // Convert to FormData
+          const formData = new FormData();
+          Object.entries(data).forEach(([key, value]) => {
+            if (key === "images" && Array.isArray(value)) {
+              // Backend expects 'images' field
+              value.forEach((file: File) => formData.append("images", file));
+            } else if (key === "existingImages" && Array.isArray(value)) {
+              formData.append(key, JSON.stringify(value));
+            } else if (
+              key === "specifications" ||
+              key === "featuresBenefits" ||
+              key === "applications" ||
+              key === "certifications" ||
+              key === "technicalDetails" ||
+              key === "imageGallery"
+            ) {
+              formData.append(key, JSON.stringify(value));
+            } else if (value !== undefined && value !== null) {
+              formData.append(key, value);
+            }
+          });
+          
+          console.log("Converted FormData contents:");
+          for (let [key, value] of formData.entries()) {
+            console.log(`${key}:`, value);
+          }
+          
         response = await fetch(`/api/products/${editingProduct.id}`, {
           method: "PUT",
           body: formData,
         });
+        }
       } else {
+        console.log("Using JSON for text-only update");
         // Send as JSON
         const dataToSend = {
           ...data,
@@ -1197,6 +1353,7 @@ export default function AdminDashboard() {
           certifications: JSON.stringify(data.certifications),
           technicalDetails: JSON.stringify(data.technicalDetails),
           existingImages: data.existingImages ? JSON.stringify(data.existingImages) : undefined,
+          imageGallery: data.imageGallery ? JSON.stringify(data.imageGallery) : undefined,
         };
         response = await fetch(`/api/products/${editingProduct.id}`, {
           method: "PUT",
@@ -1208,6 +1365,7 @@ export default function AdminDashboard() {
       if (response.ok) {
         const updatedProduct = await response.json();
         setEditingProduct(null);
+        queryClient.invalidateQueries({ queryKey: ["/api/products"] });
         toast({
           title: "Success",
           description: "Product updated successfully",
@@ -2033,7 +2191,12 @@ export default function AdminDashboard() {
                         <X className="h-4 w-4" />
                       </Button>
                     </div>
-                    <ProductFormV2 onSubmit={handleAddProductV2} loading={false} mode="add" />
+                    <ProductFormV2 
+                      onSubmit={handleAddProductV2} 
+                      loading={false} 
+                      mode="add" 
+                      categories={categories}
+                    />
                   </div>
                 </div>
 
@@ -2057,6 +2220,7 @@ export default function AdminDashboard() {
                         mode="edit"
                         loading={false}
                         onSubmit={handleUpdateProductV2}
+                        categories={categories}
                       />
                     )}
                   </div>
@@ -2217,6 +2381,30 @@ export default function AdminDashboard() {
                         />
                       </div>
                       <div>
+                        <label className="block text-sm font-medium mb-1">Upload Image</label>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          onChange={(e) => handleEventFileChange(e, false)}
+                          className="mb-2"
+                        />
+                        <div className="flex gap-2 flex-wrap">
+                          {eventPreviews.map((src, idx) => (
+                            <div key={idx} className="relative">
+                              <img src={src} alt={`Preview ${idx}`} className="w-20 h-20 object-cover rounded border" />
+                              <button
+                                type="button"
+                                className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-1 text-xs"
+                                onClick={() => handleRemoveEventFile(idx, false)}
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
                         <label className="block text-sm font-medium mb-1">Event Date</label>
                         <Input
                           type="date"
@@ -2348,22 +2536,46 @@ export default function AdminDashboard() {
                             rows={3}
                           />
                         </div>
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Image URL</label>
-                          <Input
-                            value={editingEvent.imageUrl}
-                            onChange={(e) => setEditingEvent({ ...editingEvent, imageUrl: e.target.value })}
-                            placeholder="https://example.com/image.jpg"
-                          />
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Image URL</label>
+                        <Input
+                          value={editingEvent.imageUrl}
+                          onChange={(e) => setEditingEvent({ ...editingEvent, imageUrl: e.target.value })}
+                          placeholder="https://example.com/image.jpg"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Upload Image</label>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          onChange={(e) => handleEventFileChange(e, true)}
+                          className="mb-2"
+                        />
+                        <div className="flex gap-2 flex-wrap">
+                          {editingEventPreviews.map((src, idx) => (
+                            <div key={idx} className="relative">
+                              <img src={src} alt={`Preview ${idx}`} className="w-20 h-20 object-cover rounded border" />
+                              <button
+                                type="button"
+                                className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-1 text-xs"
+                                onClick={() => handleRemoveEventFile(idx, true)}
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
                         </div>
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Event Date</label>
-                          <Input
-                            type="date"
-                            value={editingEvent.eventDate}
-                            onChange={(e) => setEditingEvent({ ...editingEvent, eventDate: e.target.value })}
-                          />
-                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Event Date</label>
+                        <Input
+                          type="date"
+                          value={editingEvent.eventDate}
+                          onChange={(e) => setEditingEvent({ ...editingEvent, eventDate: e.target.value })}
+                        />
+                      </div>
                         <div>
                           <label className="block text-sm font-medium mb-1">Content (Full Event Details)</label>
                           <Textarea

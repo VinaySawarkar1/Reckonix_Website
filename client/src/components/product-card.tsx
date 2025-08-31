@@ -47,7 +47,7 @@ export default function ProductCard({ product }: ProductCardProps) {
         <Link href={`/products/${product.id}`}>
           <div className="relative">
             {/** Use first image from images array if available, else fallback */}
-            <img 
+            <img
               src={
                 product.images && product.images.length > 0
                   ? product.images[0].url
@@ -55,6 +55,10 @@ export default function ProductCard({ product }: ProductCardProps) {
               }
               alt={product.name}
               className="w-full h-48 object-contain bg-white"
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                target.src = "/default-placeholder.jpg";
+              }}
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
           </div>

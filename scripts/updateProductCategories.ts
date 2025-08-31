@@ -1,38 +1,36 @@
-import { PrismaClient } from '@prisma/client';
-const prisma = new PrismaClient();
+import { getDb } from '../server/mongo.js';
 
 async function main() {
+  const db = await getDb();
+  const productsCollection = db.collection('Product');
+
   // Update all MEATEST products to have correct category structure
-  const updatedProducts = await prisma.product.updateMany({
-    where: {
-      OR: [
-        { name: { contains: '9000' } },
-        { name: { contains: '9010' } },
-        { name: { contains: 'M160' } },
-        { name: { contains: 'Model' } },
-        { category: { contains: 'Multi‑Product Calibrators' } },
-        { category: { contains: 'Category Placeholder' } }
+  const updateResult = await productsCollection.updateMany(
+    {
+      $or: [
+        { name: { $regex: '9000' } },
+        { name: { $regex: '9010' } },
+        { name: { $regex: 'M160' } },
+        { name: { $regex: 'Model' } },
+        { category: { $regex: 'Multi‑Product Calibrators' } },
+        { category: { $regex: 'Category Placeholder' } }
       ]
     },
-    data: {
-      category: 'Calibration System',
-      subcategory: 'Electrical Calibrators'
+    {
+      $set: {
+        category: 'Calibration System',
+        subcategory: 'Electrical Calibrators'
+      }
     }
-  });
+  );
 
-  console.log(`Updated ${updatedProducts.count} products with correct category structure`);
-  
+  console.log(`Updated ${updateResult.modifiedCount} products with correct category structure`);
+
   // Verify the changes
-  const products = await prisma.product.findMany({
-    where: {
-      category: 'Calibration System'
-    },
-    select: {
-      name: true,
-      category: true,
-      subcategory: true
-    }
-  });
+  const products = await productsCollection.find(
+    { category: 'Calibration System' },
+    { projection: { name: 1, category: 1, subcategory: 1 } }
+  ).toArray();
 
   console.log('\nUpdated products:');
   products.forEach(product => {

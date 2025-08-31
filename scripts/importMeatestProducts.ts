@@ -1,6 +1,4 @@
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { getDb } from '../server/mongo.js';
 
 const meatestProducts = [
   // Multi-Product Calibrators
@@ -408,29 +406,28 @@ async function main() {
   console.log('Importing MEATEST calibration products...\n');
 
   try {
+    const db = await getDb();
+    const productsCollection = db.collection('Product');
+
     let createdCount = 0;
     let updatedCount = 0;
 
     for (const product of meatestProducts) {
       try {
         // Check if product already exists
-        const existingProduct = await prisma.product.findFirst({
-          where: { name: product.name }
-        });
+        const existingProduct = await productsCollection.findOne({ name: product.name });
 
         if (existingProduct) {
           // Update existing product
-          await prisma.product.update({
-            where: { id: existingProduct.id },
-            data: product
-          });
+          await productsCollection.updateOne(
+            { name: product.name },
+            { $set: product }
+          );
           updatedCount++;
           console.log(`Updated: ${product.name}`);
         } else {
           // Create new product
-          await prisma.product.create({
-            data: product
-          });
+          await productsCollection.insertOne(product);
           createdCount++;
           console.log(`Created: ${product.name}`);
         }
@@ -446,8 +443,6 @@ async function main() {
 
   } catch (error) {
     console.error('Error during import:', error);
-  } finally {
-    await prisma.$disconnect();
   }
 }
 
