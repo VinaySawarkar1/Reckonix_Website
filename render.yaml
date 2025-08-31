@@ -1,10 +1,10 @@
 services:
-  # Backend API service
+  # Combined Backend + Frontend service
   - type: web
-    name: reckonix-backend
+    name: reckonix-fullstack
     env: node
     plan: starter
-    buildCommand: npm install && npm run build:server
+    buildCommand: npm install && npm run build:fullstack
     startCommand: npm start
     envVars:
       - key: NODE_ENV
@@ -14,16 +14,4 @@ services:
       - key: PORT
         value: 10000
     healthCheckPath: /api/products
-    autoDeploy: true
-
-  # Frontend static site
-  - type: web
-    name: reckonix-frontend
-    env: static
-    plan: starter
-    buildCommand: cd client && npm install && npm run build
-    staticPublishPath: ./client/dist
-    envVars:
-      - key: VITE_API_URL
-        value: https://reckonix-backend.onrender.com
     autoDeploy: true
