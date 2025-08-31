@@ -1,0 +1,29 @@
+services:
+  # Backend API service
+  - type: web
+    name: reckonix-backend
+    env: node
+    plan: starter
+    buildCommand: npm install && npm run build:server
+    startCommand: npm start:prod
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URL
+        sync: false
+      - key: PORT
+        value: 10000
+    healthCheckPath: /api/products
+    autoDeploy: true
+
+  # Frontend static site
+  - type: web
+    name: reckonix-frontend
+    env: static
+    plan: starter
+    buildCommand: cd client && npm install && npm run build
+    staticPublishPath: ./client/dist
+    envVars:
+      - key: VITE_API_URL
+        value: https://reckonix-backend.onrender.com
+    autoDeploy: true
