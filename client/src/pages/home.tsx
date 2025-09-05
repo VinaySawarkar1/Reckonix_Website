@@ -148,12 +148,26 @@ export default function Home() {
           key={`hero-video-${Date.now()}`}
           onLoadStart={() => console.log('Video loading started:', '/hero-video-new.mp4')}
           onLoadedData={() => console.log('Video data loaded successfully')}
-          onError={(e) => console.error('Video error:', e)}
+          onError={(e) => {
+            console.error('Video error:', e);
+            // Hide video and show fallback background
+            const video = e.target as HTMLVideoElement;
+            video.style.display = 'none';
+            const fallback = document.getElementById('hero-fallback');
+            if (fallback) fallback.style.display = 'block';
+          }}
           onCanPlay={() => console.log('Video can play')}
           preload="auto"
         >
           <source src="/hero-video-new.mp4" type="video/mp4" />
         </video>
+        
+        {/* Fallback background image when video fails */}
+        <div 
+          id="hero-fallback"
+          className="absolute inset-0 w-full h-full object-cover z-0 bg-gradient-to-br from-blue-900 to-gray-900"
+          style={{ display: 'none' }}
+        />
         
 
         
@@ -218,6 +232,10 @@ export default function Home() {
                 src="/generated-image (1).png"
                 alt="Advanced industrial precision equipment"
                 className="rounded-xl shadow-lg w-full max-w-md h-auto mx-auto"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  target.src = "/default-placeholder.jpg";
+                }}
               />
             </motion.div>
             <motion.div

@@ -457,15 +457,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Serve uploaded files
-  app.use('/uploads/products', (req, res, next) => {
-    const filePath = path.join(uploadsDir, req.path);
-    if (fs.existsSync(filePath)) {
-      res.sendFile(filePath);
-    } else {
-      res.status(404).send('File not found');
-    }
-  });
+  // Image serving is handled by the main server in index.ts
 
   // Team members route
   app.get('/api/team', async (req, res) => {
