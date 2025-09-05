@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 // Use the correct password for local development
-const mongoUri = process.env.MONGODB_URL || 'mongodb+srv://vinaysarkar0:vinasawarkar@cluster0.4adl4tl.mongodb.net/reckonix?retryWrites=true&w=majority&ssl=true&authSource=admin';
+const mongoUri = process.env.MONGODB_URL || 'mongodb+srv://vinaysarkar0:vinasawarkar@cluster0.4adl4tl.mongodb.net/reckonix?retryWrites=true&w=majority&ssl=true&authSource=admin&tls=true&tlsAllowInvalidCertificates=false';
 const client = new MongoClient(mongoUri, {
   serverApi: ServerApiVersion.v1,
   retryWrites: true,
@@ -13,6 +13,16 @@ const client = new MongoClient(mongoUri, {
   connectTimeoutMS: 10000,
   maxIdleTimeMS: 30000,
   retryReads: true,
+  // Additional SSL/TLS options for production compatibility
+  tls: true,
+  tlsAllowInvalidCertificates: false,
+  tlsAllowInvalidHostnames: false,
+  tlsInsecure: false,
+  // Force TLS 1.2 for better compatibility
+  tlsCAFile: undefined,
+  // Use unified topology for better connection handling
+  useUnifiedTopology: true,
+  useNewUrlParser: true,
 });
 
 let isConnected = false;
@@ -20,9 +30,36 @@ let isConnected = false;
 export async function getDb() {
   try {
     if (!isConnected) {
-      await client.connect();
-      isConnected = true;
-      console.log('MongoDB connected successfully');
+      // Try different connection approaches for production
+      if (process.env.NODE_ENV === 'production') {
+        // For production, try with more explicit SSL settings
+        const productionUri = mongoUri.replace('mongodb+srv://', 'mongodb+srv://').replace('?', '?ssl=true&authSource=admin&retryWrites=true&w=majority&');
+        const prodClient = new MongoClient(productionUri, {
+          serverApi: ServerApiVersion.v1,
+          retryWrites: true,
+          maxPoolSize: 5,
+          serverSelectionTimeoutMS: 15000,
+          socketTimeoutMS: 60000,
+          connectTimeoutMS: 15000,
+          maxIdleTimeMS: 30000,
+          retryReads: true,
+          tls: true,
+          tlsAllowInvalidCertificates: false,
+          tlsAllowInvalidHostnames: false,
+          tlsInsecure: false,
+          useUnifiedTopology: true,
+          useNewUrlParser: true,
+        });
+        
+        await prodClient.connect();
+        isConnected = true;
+        console.log('MongoDB connected successfully (production mode)');
+        return prodClient.db('reckonix');
+      } else {
+        await client.connect();
+        isConnected = true;
+        console.log('MongoDB connected successfully');
+      }
     }
     return client.db('reckonix'); // Use your MongoDB database name
   } catch (err) {
