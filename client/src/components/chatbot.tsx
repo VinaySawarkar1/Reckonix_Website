@@ -214,7 +214,7 @@ export default function Chatbot() {
     // Add bot response
     setTimeout(() => {
       setMessages([...newMessages, { role: "assistant", content: botResponse }]);
-      setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+    setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
     }, 500); // Small delay to simulate typing
   };
 

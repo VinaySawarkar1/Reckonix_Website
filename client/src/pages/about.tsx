@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Building, MapPin, Eye, Flag } from "lucide-react";
+import { Building, MapPin, Eye, Flag, Users } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import SEO from "../components/seo";
 

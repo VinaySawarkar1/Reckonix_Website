@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from "react
 import { apiRequest } from "@/lib/queryClient";
 
 interface User {
-  id: number;
+  id: string | number;
   username: string;
   role: string;
 }
@@ -50,9 +50,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const response = await apiRequest("POST", "/api/auth/login", credentials);
       const data = await response.json();
       
-      setUser(data.user);
-      localStorage.setItem("auth_user", JSON.stringify(data.user));
-      localStorage.setItem("auth_token", data.token);
+      if (data.success && data.user) {
+        setUser(data.user);
+        localStorage.setItem("auth_user", JSON.stringify(data.user));
+        // Generate a simple token for session management
+        const token = btoa(JSON.stringify({ userId: data.user.id, timestamp: Date.now() }));
+        localStorage.setItem("auth_token", token);
+      } else {
+        throw new Error(data.error || "Login failed");
+      }
     } catch (error) {
       throw new Error("Invalid credentials");
     }

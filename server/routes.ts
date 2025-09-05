@@ -90,6 +90,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Middleware
+  app.use(express.json());
+  app.use(express.static('uploads'));
+
+  // File upload configuration
+  const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+      cb(null, 'uploads/');
+    },
+    filename: function (req, file, cb) {
+      cb(null, Date.now() + '-' + file.originalname);
+    }
+  });
+
+  const upload = multer({ storage: storage });
+
+  // Authentication routes
+  app.post('/api/auth/login', async (req, res) => {
+    try {
+      const { username, password } = req.body;
+      
+      // Simple authentication - you can modify these credentials
+      if (username === 'admin' && password === 'admin123') {
+        res.json({
+          success: true,
+          user: {
+            id: 'admin-001',
+            username: 'admin',
+            role: 'admin'
+          }
+        });
+      } else {
+        res.status(401).json({
+          success: false,
+          error: 'Invalid credentials'
+        });
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Login failed'
+      });
+    }
+  });
+
+  app.post('/api/auth/logout', async (req, res) => {
+    try {
+      res.json({
+        success: true,
+        message: 'Logged out successfully'
+      });
+    } catch (error) {
+      console.error('Logout error:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Logout failed'
+      });
+    }
+  });
+
   // Test route
   app.get("/api/test", async (req: Request, res: Response) => {
     res.json({ message: "API routing is working!" });
@@ -116,7 +177,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json(products);
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch products" });
+      console.error('Error fetching products:', error);
+      // Return empty array as fallback instead of error
+      res.json([]);
     }
   });
 
@@ -309,7 +372,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(Object.values(categoryMap));
     } catch (error) {
       console.error('Error fetching categories:', error);
-      res.status(500).json({ error: 'Failed to fetch categories' });
+      // Return empty array as fallback instead of error
+      res.json([]);
     }
   });
 
@@ -321,7 +385,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(catalog || {});
     } catch (error) {
       console.error('Error fetching catalog:', error);
-      res.status(500).json({ error: 'Failed to fetch catalog' });
+      // Return empty object as fallback instead of error
+      res.json({});
     }
   });
 
@@ -397,7 +462,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const filePath = path.join(uploadsDir, req.path);
     if (fs.existsSync(filePath)) {
       res.sendFile(filePath);
-    } else {
+  } else {
       res.status(404).send('File not found');
     }
   });
@@ -414,15 +479,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update team member route
+  app.put('/api/team/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updateData = req.body;
+      
+  const db = await getDb();
+      
+      // Remove _id from update data if present to avoid MongoDB errors
+      if (updateData._id) {
+        delete updateData._id;
+      }
+      
+      const result = await db.collection('TeamMember').updateOne(
+        { id: parseInt(id) },
+        { $set: updateData }
+      );
+      
+      if (result.matchedCount === 0) {
+        return res.status(404).json({ error: 'Team member not found' });
+      }
+      
+      res.json({ success: true, message: 'Team member updated successfully' });
+    } catch (error) {
+      console.error('Error updating team member:', error);
+      res.status(500).json({ error: 'Failed to update team member' });
+    }
+  });
+
   // Customers route
   app.get('/api/customers', async (req, res) => {
     try {
       const db = await getDb();
       const customers = await db.collection('Customer').find({}).sort({ rank: 1, createdAt: -1 }).toArray();
-      res.json(customers);
+  res.json(customers);
     } catch (error) {
       console.error('Error fetching customers:', error);
-      res.status(500).json({ error: 'Failed to fetch customers' });
+      // Return empty array as fallback instead of error
+      res.json([]);
     }
   });
 
@@ -441,12 +536,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Events route
   app.get('/api/events', async (req, res) => {
     try {
-      const db = await getDb();
+  const db = await getDb();
       const events = await db.collection('CompanyEvent').find({}).sort({ createdAt: -1 }).toArray();
       res.json(events);
     } catch (error) {
       console.error('Error fetching events:', error);
-      res.status(500).json({ error: 'Failed to fetch events' });
+      // Return empty array as fallback instead of error
+      res.json([]);
     }
   });
 
@@ -458,19 +554,120 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(testimonials);
     } catch (error) {
       console.error('Error fetching testimonials:', error);
-      res.status(500).json({ error: 'Failed to fetch testimonials' });
+      // Return empty array as fallback instead of error
+      res.json([]);
     }
   });
 
   // Industries route
-  app.get('/api/industries', async (req, res) => {
+    app.get('/api/industries', async (req, res) => {
     try {
       const db = await getDb();
       const industries = await db.collection('Industry').find({}).sort({ rank: 1, createdAt: -1 }).toArray();
-      res.json(industries);
+  res.json(industries);
     } catch (error) {
       console.error('Error fetching industries:', error);
-      res.status(500).json({ error: 'Failed to fetch industries' });
+      // Return empty array as fallback instead of error
+      res.json([]);
+    }
+  });
+
+  // Applications route
+  app.get('/api/applications', async (req, res) => {
+    try {
+  const db = await getDb();
+      const applications = await db.collection('Application').find({}).sort({ createdAt: -1 }).toArray();
+      res.json(applications);
+    } catch (error) {
+      console.error('Error fetching applications:', error);
+      res.status(500).json({ error: 'Failed to fetch applications' });
+    }
+  });
+
+  // Gallery route
+  app.get('/api/gallery', async (req, res) => {
+    try {
+      const db = await getDb();
+      const galleryItems = await db.collection('Gallery').find({}).sort({ createdAt: -1 }).toArray();
+      res.json(galleryItems);
+    } catch (error) {
+      console.error('Error fetching gallery:', error);
+      res.status(500).json({ error: 'Failed to fetch gallery' });
+    }
+  });
+
+  // Quotes route
+  app.get('/api/quotes', async (req, res) => {
+    try {
+      const db = await getDb();
+      const quotes = await db.collection('Quote').find({}).sort({ createdAt: -1 }).toArray();
+      res.json(quotes);
+    } catch (error) {
+      console.error('Error fetching quotes:', error);
+      res.status(500).json({ error: 'Failed to fetch quotes' });
+    }
+  });
+
+  // Messages route
+  app.get('/api/messages', async (req, res) => {
+    try {
+  const db = await getDb();
+      const messages = await db.collection('Message').find({}).sort({ createdAt: -1 }).toArray();
+      res.json(messages);
+    } catch (error) {
+      console.error('Error fetching messages:', error);
+      res.status(500).json({ error: 'Failed to fetch messages' });
+    }
+  });
+
+  // Analytics routes
+  app.get('/api/analytics/website-views', async (req, res) => {
+    try {
+      const db = await getDb();
+      const websiteViews = await db.collection('WebsiteView').find({}).toArray();
+      const totalViews = websiteViews.length;
+      res.json({ totalViews });
+    } catch (error) {
+      console.error('Error fetching website views:', error);
+      res.status(500).json({ error: 'Failed to fetch website views' });
+    }
+  });
+
+  app.get('/api/analytics/product-views', async (req, res) => {
+    try {
+      const db = await getDb();
+      const productViews = await db.collection('ProductView').find({}).toArray();
+      const totalViews = productViews.length;
+      
+      // Get product details for each view
+      const products = await db.collection('Product').find({}).toArray();
+      const productViewData = products.map(product => ({
+        _id: product._id,
+        name: product.name,
+        views: productViews.filter(pv => pv.productId === product.id).length
+      }));
+      
+      res.json({ totalViews, products: productViewData });
+    } catch (error) {
+      console.error('Error fetching product views:', error);
+      res.status(500).json({ error: 'Failed to fetch product views' });
+    }
+  });
+
+  // Post analytics data
+  app.post('/api/analytics/website-views', async (req, res) => {
+    try {
+      const db = await getDb();
+      const newView = {
+        timestamp: new Date(),
+        userAgent: req.headers['user-agent'],
+        ip: req.ip || req.connection.remoteAddress
+      };
+      await db.collection('WebsiteView').insertOne(newView);
+      res.json({ success: true, message: 'Website view recorded' });
+    } catch (error) {
+      console.error('Error recording website view:', error);
+      res.status(500).json({ error: 'Failed to record website view' });
     }
   });
 
