@@ -169,9 +169,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (typeof product.id === 'number') imageQuery.$or.push({ productId: product.id });
         
         if (imageQuery.$or.length > 0) {
-          product.images = await db.collection('ProductImage').find(imageQuery).toArray();
+          const images = await db.collection('ProductImage').find(imageQuery).toArray();
+          product.images = images;
+          // Set the main image field for frontend compatibility
+          if (images.length > 0) {
+            product.image = images[0].url;
+          }
         } else {
           product.images = [];
+          product.image = null;
         }
       }
 
@@ -214,6 +220,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         images = await db.collection('ProductImage').find(imageQuery).toArray();
       }
       product.images = images;
+      // Set the main image field for frontend compatibility
+      if (images.length > 0) {
+        product.image = images[0].url;
+      } else {
+        product.image = null;
+      }
 
       res.json(product);
     } catch (error) {

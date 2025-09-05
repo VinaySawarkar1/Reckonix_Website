@@ -156,7 +156,17 @@ export default function Home() {
             const fallback = document.getElementById('hero-fallback');
             if (fallback) fallback.style.display = 'block';
           }}
-          onCanPlay={() => console.log('Video can play')}
+          onCanPlay={(e) => {
+            console.log('Video can play');
+            // Try to play the video
+            const video = e.target as HTMLVideoElement;
+            video.play().catch(err => {
+              console.log('Autoplay failed, showing fallback:', err);
+              video.style.display = 'none';
+              const fallback = document.getElementById('hero-fallback');
+              if (fallback) fallback.style.display = 'block';
+            });
+          }}
           preload="auto"
         >
           <source src="/hero-video-new.mp4" type="video/mp4" />
