@@ -17,9 +17,6 @@ const client = new MongoClient(mongoUri, {
   tls: true,
   tlsAllowInvalidCertificates: false,
   tlsAllowInvalidHostnames: false,
-  tlsInsecure: false,
-  // Force TLS 1.2 for better compatibility
-  tlsCAFile: undefined,
 });
 
 let isConnected = false;
@@ -43,7 +40,6 @@ export async function getDb() {
           tls: true,
           tlsAllowInvalidCertificates: false,
           tlsAllowInvalidHostnames: false,
-          tlsInsecure: false,
         });
         
         await prodClient.connect();
