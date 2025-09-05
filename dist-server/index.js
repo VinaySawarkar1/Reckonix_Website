@@ -1,15 +1,20 @@
-import dotenv from "dotenv";
-dotenv.config();
-import express from "express";
-import { registerRoutes } from "./routes";
-import path from "path";
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const dotenv_1 = __importDefault(require("dotenv"));
+dotenv_1.default.config();
+const express_1 = __importDefault(require("express"));
+const routes_1 = require("./routes");
+const path_1 = __importDefault(require("path"));
 console.log('CWD:', process.cwd());
 console.log('MONGODB_URL:', process.env.MONGODB_URL);
-const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+const app = (0, express_1.default)();
+app.use(express_1.default.json());
+app.use(express_1.default.urlencoded({ extended: false }));
 // Serve uploads directory for product images
-app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+app.use('/uploads', express_1.default.static(path_1.default.join(process.cwd(), 'uploads')));
 app.use((req, res, next) => {
     const start = Date.now();
     const path = req.path;
@@ -35,7 +40,7 @@ app.use((req, res, next) => {
     next();
 });
 (async () => {
-    const server = await registerRoutes(app);
+    const server = await (0, routes_1.registerRoutes)(app);
     app.use((err, _req, res, _next) => {
         const status = err.status || err.statusCode || 500;
         const message = err.message || "Internal Server Error";
@@ -43,11 +48,11 @@ app.use((req, res, next) => {
         throw err;
     });
     // Serve static files in production
-    const distPath = path.resolve(process.cwd(), 'client/dist');
-    app.use(express.static(distPath));
+    const distPath = path_1.default.resolve(process.cwd(), 'client/dist');
+    app.use(express_1.default.static(distPath));
     // fall through to index.html if the file doesn't exist
     app.use("*", (_req, res) => {
-        res.sendFile(path.resolve(distPath, "index.html"));
+        res.sendFile(path_1.default.resolve(distPath, "index.html"));
     });
     // Use Railway's PORT environment variable or default to 5001
     const port = process.env.PORT || 5001;

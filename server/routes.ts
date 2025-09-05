@@ -462,7 +462,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const filePath = path.join(uploadsDir, req.path);
     if (fs.existsSync(filePath)) {
       res.sendFile(filePath);
-  } else {
+    } else {
       res.status(404).send('File not found');
     }
   });
