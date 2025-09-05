@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 // Use the correct password for local development
-const mongoUri = process.env.MONGODB_URL || 'mongodb+srv://vinaysarkar0:vinasawarkar@cluster0.4adl4tl.mongodb.net/reckonix?retryWrites=true&w=majority&ssl=true&authSource=admin&tls=true&tlsAllowInvalidCertificates=false';
+const mongoUri = process.env.MONGODB_URL || 'mongodb+srv://vinaysarkar0:vinasawarkar@cluster0.4adl4tl.mongodb.net/reckonix?retryWrites=true&w=majority&authSource=admin';
 const client = new MongoClient(mongoUri, {
   serverApi: ServerApiVersion.v1,
   retryWrites: true,
@@ -26,8 +26,8 @@ export async function getDb() {
     if (!isConnected) {
       // Try different connection approaches for production
       if (process.env.NODE_ENV === 'production') {
-        // For production, try with more explicit SSL settings
-        const productionUri = mongoUri.replace('mongodb+srv://', 'mongodb+srv://').replace('?', '?ssl=true&authSource=admin&retryWrites=true&w=majority&');
+        // For production, use the same URI as it already has all needed parameters
+        const productionUri = mongoUri;
         const prodClient = new MongoClient(productionUri, {
           serverApi: ServerApiVersion.v1,
           retryWrites: true,
