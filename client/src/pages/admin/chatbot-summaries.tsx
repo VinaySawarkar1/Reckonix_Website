@@ -59,9 +59,9 @@ export default function ChatbotSummariesAdmin() {
               </tr>
             ) : (
               summaries.map((s) => (
-                <tr key={s.sessionId + s.createdAt}>
+                <tr key={s.sessionId || s._id || s.createdAt}>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{new Date(s.createdAt).toLocaleString()}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm capitalize text-primary font-semibold">{s.type.replace("_", " ")}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm capitalize text-primary font-semibold">{s.type ? s.type.replace("_", " ") : "-"}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{s.name || "-"}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{s.email || "-"}</td>
                   <td className="px-6 py-4 whitespace-pre-line text-sm text-gray-900 max-w-xs break-words">{s.message}</td>

@@ -97,14 +97,44 @@ const USER_ICON = (
   </div>
 );
 
-function ChatbotHeader() {
+function ChatbotHeader({ onMinimize, onClose, minimized, messageCount }: { onMinimize: () => void, onClose: () => void, minimized: boolean, messageCount: number }) {
   return (
-    <div className="bg-[#800000] text-white px-4 py-3 rounded-t-2xl font-bold text-lg flex items-center justify-between shadow-md">
+    <div className="bg-[#800000] text-white px-4 py-3 rounded-t-2xl font-bold text-lg flex items-center justify-between shadow-md flex-shrink-0">
       <span className="flex items-center gap-2">
         <svg width="28" height="28" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#fff"/><ellipse cx="12" cy="15" rx="6" ry="3" fill="#800000"/><circle cx="9" cy="10" r="1.5" fill="#800000"/><circle cx="15" cy="10" r="1.5" fill="#800000"/></svg>
         Reckonix AI Assistant
+        {minimized && messageCount > 0 && (
+          <span className="bg-red-500 text-white text-xs rounded-full px-2 py-1 ml-2 animate-pulse">
+            {messageCount}
+          </span>
+        )}
       </span>
-      <button className="text-white hover:text-gray-200 text-2xl font-bold ml-2 focus:outline-none" id="close-chatbot-btn" aria-label="Close chat">×</button>
+      <div className="flex items-center gap-2">
+        <button 
+          className="text-white hover:text-gray-200 text-xl font-bold focus:outline-none p-1 rounded hover:bg-white hover:bg-opacity-20 transition-colors" 
+          onClick={onMinimize}
+          aria-label={minimized ? "Expand chat" : "Minimize chat"}
+          title={minimized ? "Expand chat" : "Minimize chat"}
+        >
+          {minimized ? (
+            <svg width="20" height="20" fill="none" viewBox="0 0 24 24">
+              <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+            </svg>
+          ) : (
+            <svg width="20" height="20" fill="none" viewBox="0 0 24 24">
+              <path d="M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+            </svg>
+          )}
+        </button>
+        <button 
+          className="text-white hover:text-gray-200 text-2xl font-bold focus:outline-none p-1 rounded hover:bg-white hover:bg-opacity-20 transition-colors" 
+          onClick={onClose}
+          aria-label="Close chat"
+          title="Close chat"
+        >
+          ×
+        </button>
+      </div>
     </div>
   );
 }
@@ -172,6 +202,7 @@ export default function Chatbot() {
   const [messages, setMessages] = useState<Array<{role: string, content: string}>>([]);
   const [input, setInput] = useState("");
   const [open, setOpen] = useState(false);
+  const [minimized, setMinimized] = useState(false);
   const [askedName, setAskedName] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [conversationState, setConversationState] = useState({
@@ -190,13 +221,16 @@ export default function Chatbot() {
     }
   }, [open, askedName]);
 
-  // Always attach close handler to header button
-  useEffect(() => {
-    if (open) {
-      const btn = document.getElementById("close-chatbot-btn");
-      if (btn) btn.onclick = () => setOpen(false);
-    }
-  }, [open]);
+  // Handle minimize/expand
+  const handleMinimize = () => {
+    setMinimized(!minimized);
+  };
+
+  // Handle close
+  const handleClose = () => {
+    setOpen(false);
+    setMinimized(false);
+  };
 
   const sendMessage = (e: React.FormEvent) => {
     e.preventDefault();
@@ -249,12 +283,12 @@ export default function Chatbot() {
     );
   }
 
-  // Responsive height
+  // Responsive height - adjust for minimized state
   const chatWindowStyle = {
     overflow: 'hidden',
-    maxHeight: 'calc(100vh - 100px)',
-    minHeight: '350px',
-    height: window.innerWidth < 600 ? '60vh' : '500px',
+    maxHeight: minimized ? 'auto' : 'calc(100vh - 120px)',
+    minHeight: minimized ? 'auto' : '350px',
+    height: minimized ? 'auto' : (window.innerWidth < 600 ? '60vh' : '450px'),
     width: window.innerWidth < 600 ? '90vw' : '400px',
     maxWidth: '95vw',
   };
@@ -263,9 +297,7 @@ export default function Chatbot() {
     <div
       className="fixed right-6 z-50"
       style={{
-        margin: '8px',
         bottom: '24px',
-        top: '80px',
         maxHeight: 'calc(100vh - 100px)',
         maxWidth: '95vw',
         display: 'flex',
@@ -278,56 +310,63 @@ export default function Chatbot() {
         style={chatWindowStyle}
       >
         {/* Header */}
-        <ChatbotHeader />
+        <ChatbotHeader 
+          onMinimize={handleMinimize} 
+          onClose={handleClose} 
+          minimized={minimized}
+          messageCount={messages.length}
+        />
         
-        {/* Chat area */}
-        <div className="flex-1 flex flex-col" style={{background: 'transparent', borderBottom: '1px solid #e5e7eb'}}>
-          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4" style={{maxHeight: '420px', minHeight: '120px', borderRadius: '8px', boxShadow: '0 1px 2px rgba(0,0,0,0.03)'}}>
-            {messages.map((msg, i) => (
-              <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"} items-end`}>
-                {msg.role === "assistant" && <div className="mr-2">{BOT_ICON}</div>}
-                <div
-                  className={`rounded-2xl px-4 py-2 text-base shadow-sm ${msg.role === "user" ? "bg-[#800000] text-white rounded-br-md" : "bg-white text-gray-900 rounded-bl-md border border-gray-200"}`}
-                  style={{
-                    maxWidth: '75%',
-                    wordBreak: 'break-word',
-                    whiteSpace: 'pre-line',
-                    overflowWrap: 'break-word',
-                    overflowX: 'hidden',
-                    marginBottom: 2,
-                    fontSize: '1rem',
-                    letterSpacing: '0.01em',
-                  }}
-                >
-                  {msg.content}
+        {/* Chat area - only show when not minimized */}
+        {!minimized && (
+          <div className="flex-1 flex flex-col" style={{background: 'transparent', borderBottom: '1px solid #e5e7eb', minHeight: 0}}>
+            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4" style={{maxHeight: '350px', minHeight: '120px', borderRadius: '8px', boxShadow: '0 1px 2px rgba(0,0,0,0.03)'}}>
+              {messages.map((msg, i) => (
+                <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"} items-end`}>
+                  {msg.role === "assistant" && <div className="mr-2">{BOT_ICON}</div>}
+                  <div
+                    className={`rounded-2xl px-4 py-2 text-base shadow-sm ${msg.role === "user" ? "bg-[#800000] text-white rounded-br-md" : "bg-white text-gray-900 rounded-bl-md border border-gray-200"}`}
+                    style={{
+                      maxWidth: '75%',
+                      wordBreak: 'break-word',
+                      whiteSpace: 'pre-line',
+                      overflowWrap: 'break-word',
+                      overflowX: 'hidden',
+                      marginBottom: 2,
+                      fontSize: '1rem',
+                      letterSpacing: '0.01em',
+                    }}
+                  >
+                    {msg.content}
+                  </div>
+                  {msg.role === "user" && <div className="ml-2">{USER_ICON}</div>}
                 </div>
-                {msg.role === "user" && <div className="ml-2">{USER_ICON}</div>}
-              </div>
-            ))}
-            <div ref={messagesEndRef} />
+              ))}
+              <div ref={messagesEndRef} />
+            </div>
+            
+            {/* Input area */}
+            <form onSubmit={sendMessage} className="flex items-center gap-2 border-t border-gray-200 px-3 py-3 bg-white flex-shrink-0" style={{minHeight: '56px', borderRadius: '0 0 0 0'}}>
+              <button type="button" className="text-gray-400 hover:text-gray-600 p-1" tabIndex={-1} title="Emoji (not implemented)"><span role="img" aria-label="emoji">😊</span></button>
+              <input
+                className="flex-1 px-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#800000] text-base bg-[#fafafa]"
+                type="text"
+                placeholder="Type a message ..."
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                style={{minWidth: 0}}
+              />
+              <button
+                type="submit"
+                className="px-4 py-2 rounded-lg bg-[#800000] text-white font-semibold hover:bg-[#6b0000] transition flex items-center justify-center"
+                disabled={!input.trim()}
+                style={{minWidth: 44, minHeight: 44}}
+              >
+                <svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </button>
+            </form>
           </div>
-          
-          {/* Input area */}
-          <form onSubmit={sendMessage} className="flex items-center gap-2 border-t border-gray-200 px-3 py-3 bg-white" style={{minHeight: '56px', borderRadius: '0 0 0 0'}}>
-            <button type="button" className="text-gray-400 hover:text-gray-600 p-1" tabIndex={-1} title="Emoji (not implemented)"><span role="img" aria-label="emoji">😊</span></button>
-            <input
-              className="flex-1 px-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#800000] text-base bg-[#fafafa]"
-              type="text"
-              placeholder="Type a message ..."
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              style={{minWidth: 0}}
-            />
-            <button
-              type="submit"
-              className="px-4 py-2 rounded-lg bg-[#800000] text-white font-semibold hover:bg-[#6b0000] transition flex items-center justify-center"
-              disabled={!input.trim()}
-              style={{minWidth: 44, minHeight: 44}}
-            >
-              <svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            </button>
-          </form>
-        </div>
+        )}
       </div>
     </div>
   );

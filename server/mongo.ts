@@ -44,26 +44,26 @@ export async function getDb() {
         
         await prodClient.connect();
         isConnected = true;
-        console.log('MongoDB connected successfully (production mode)');
+        // Console log removed for production');
         return prodClient.db('reckonix');
       } else {
         await client.connect();
         isConnected = true;
-        console.log('MongoDB connected successfully');
+        // Console log removed for production
       }
     }
     return client.db('reckonix'); // Use your MongoDB database name
   } catch (err) {
-    console.error('MongoDB connection error:', err);
+    // Console log removed for production
     isConnected = false;
     // Try to reconnect after a short delay
     setTimeout(async () => {
       try {
         await client.connect();
         isConnected = true;
-        console.log('MongoDB reconnected successfully');
+        // Console log removed for production
       } catch (retryErr) {
-        console.error('MongoDB reconnection failed:', retryErr);
+        // Console log removed for production
       }
     }, 5000);
     throw err;

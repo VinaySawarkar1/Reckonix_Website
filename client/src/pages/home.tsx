@@ -6,6 +6,7 @@ import AnimatedCounter from "../components/animated-counter";
 import CustomerLogo from "../components/customer-logo";
 import IconCard from "../components/icon-card";
 import SEO from "../components/seo";
+import { useMediaSettings, type MediaSettings } from "@/hooks/use-media-settings";
 import {
   Medal,
   Lightbulb,
@@ -15,7 +16,7 @@ import {
   Play,
   Download,
 } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useEffect, useState } from "react";
 import { apiRequest } from "@/lib/queryClient";
 import type { Product, Customer, CompanyEvent } from "../../../shared/schema";
@@ -23,6 +24,7 @@ import { useCategories } from "@/context/category-context";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function Home() {
+  const [location] = useLocation();
   const { data: products = [] } = useQuery<Product[]>({
     queryKey: ["/api/products"],
   });
@@ -31,12 +33,15 @@ export default function Home() {
   
   const { data: events = [] } = useQuery<CompanyEvent[]>({
     queryKey: ["/api/events"],
+    refetchOnWindowFocus: true,
+    staleTime: 0, // Always consider data stale
   });
 
   const { data: customers = [] } = useQuery<Customer[]>({
     queryKey: ["/api/customers"],
   });
 
+  const { data: mediaSettings } = useMediaSettings() as { data: MediaSettings | undefined };
   const { categories, loading } = useCategories();
   const [activeTab, setActiveTab] = useState("");
 
@@ -45,10 +50,37 @@ export default function Home() {
     apiRequest("POST", "/api/analytics/website-views");
   }, []);
 
-  // Set default active tab when categories load
+  // Parse URL parameters to get category
+  const getCategoryFromURL = () => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      return urlParams.get('category');
+    }
+    return null;
+  };
+
+  // Set active tab based on URL parameter or default to first category
   useEffect(() => {
-    if (categories.length > 0 && !activeTab) {
-      setActiveTab(categories[0].name);
+    if (categories.length > 0) {
+      const categoryFromURL = getCategoryFromURL();
+      if (categoryFromURL) {
+        // Check if the category from URL exists in our categories
+        const categoryExists = categories.some(cat => cat.name === categoryFromURL);
+        if (categoryExists) {
+          setActiveTab(categoryFromURL);
+          // Scroll to products section after a short delay to ensure DOM is ready
+          setTimeout(() => {
+            const productsSection = document.getElementById('products-section');
+            if (productsSection) {
+              productsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+          }, 100);
+        } else {
+          setActiveTab(categories[0].name);
+        }
+      } else if (!activeTab) {
+        setActiveTab(categories[0].name);
+      }
     }
   }, [categories, activeTab]);
 
@@ -146,10 +178,9 @@ export default function Home() {
             zIndex: 0
           }}
           key={`hero-video-${Date.now()}`}
-          onLoadStart={() => console.log('Video loading started:', '/hero-video-new.mp4')}
-          onLoadedData={() => console.log('Video data loaded successfully')}
+          onLoadStart={() => {}}
+          onLoadedData={() => {}}
           onError={(e) => {
-            console.error('Video error:', e);
             // Hide video and show fallback background
             const video = e.target as HTMLVideoElement;
             video.style.display = 'none';
@@ -157,11 +188,9 @@ export default function Home() {
             if (fallback) fallback.style.display = 'block';
           }}
           onCanPlay={(e) => {
-            console.log('Video can play');
             // Try to play the video
             const video = e.target as HTMLVideoElement;
             video.play().catch(err => {
-              console.log('Autoplay failed, showing fallback:', err);
               video.style.display = 'none';
               const fallback = document.getElementById('hero-fallback');
               if (fallback) fallback.style.display = 'block';
@@ -169,7 +198,7 @@ export default function Home() {
           }}
           preload="auto"
         >
-          <source src="/hero-video-new.mp4" type="video/mp4" />
+          <source src={mediaSettings?.heroVideo || "/hero-video-new.mp4"} type="video/mp4" />
         </video>
         
         {/* Fallback background image when video fails */}
@@ -239,7 +268,7 @@ export default function Home() {
               transition={{ duration: 0.6 }}
             >
               <img
-                src="/generated-image (1).png"
+                src={mediaSettings?.homeAboutImage || "/generated-image (1).png"}
                 alt="Advanced industrial precision equipment"
                 className="rounded-xl shadow-lg w-full max-w-md h-auto mx-auto"
                 onError={(e) => {
@@ -426,7 +455,7 @@ export default function Home() {
               >
                 <div className="relative h-48 overflow-hidden">
                   <img
-                    src={event.imageUrl as string}
+                    src={`${event.imageUrl as string}?v=${(event as any)._id || event.createdAt || Date.now()}`}
                     alt={event.title}
                     className="w-full h-full object-cover transform hover:scale-105 transition-transform duration-300"
                     onError={(e) => {

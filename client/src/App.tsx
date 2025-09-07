@@ -14,7 +14,7 @@ import Products from "./pages/products";
 import ProductDetail from "./pages/product-detail";
 import About from "./pages/about";
 import Contact from "./pages/contact";
-import Customers from "./pages/customers";
+import Industries from "./pages/industries";
 import AdminLogin from "./pages/admin/login";
 import AdminDashboard from "./pages/admin/dashboard";
 import NotFound from "@/pages/not-found";
@@ -41,17 +41,24 @@ function Router() {
       <Route path="/products/tape-scale-calibrator" component={TapeScaleCalibrator} />
       <Route path="/about" component={About} />
       <Route path="/contact" component={Contact} />
-      <Route path="/customers" component={Customers} />
+      <Route path="/industries" component={Industries} />
 
       <Route path="/cart" component={CartPage} />
 
-      <Route path="/admin/login" component={AdminLogin} />
-      <Route path="/admin" component={AdminDashboard} />
-      <Route path="/admin/category-management" component={CategoryManagement} />
+      {/* Old admin URLs return 404 for security */}
+      <Route path="/admin/login" component={NotFound} />
+      <Route path="/admin" component={NotFound} />
+      <Route path="/admin/category-management" component={NotFound} />
+      <Route path="/admin/chatbot-summaries" component={NotFound} />
+      
+      {/* New protected admin routes */}
+      <Route path="/reckonix/team/admin/login" component={AdminLogin} />
+      <Route path="/reckonix/team/admin" component={AdminDashboard} />
+      <Route path="/reckonix/team/admin/category-management" component={CategoryManagement} />
       <Route path="/career" component={Career} />
       <Route path="/gallery" component={GalleryPage} />
       <Route path="/event-detail" component={EventDetail} />
-      <Route path="/admin/chatbot-summaries" component={ChatbotSummariesAdmin} />
+      <Route path="/reckonix/team/admin/chatbot-summaries" component={ChatbotSummariesAdmin} />
       <Route component={NotFound} />
     </Switch>
   );

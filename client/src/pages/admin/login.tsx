@@ -27,7 +27,7 @@ export default function AdminLogin() {
         title: "Login Successful",
         description: "Welcome to the admin dashboard!",
       });
-      setLocation("/admin");
+      setLocation("/reckonix/team/admin");
     },
     onError: (error: any) => {
       toast({

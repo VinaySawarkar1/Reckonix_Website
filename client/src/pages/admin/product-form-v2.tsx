@@ -99,7 +99,7 @@ export default function ProductFormV2({ initialData, mode, loading, onSubmit, ca
   // Update form data when initialData changes (prevents blank form on edit)
   useEffect(() => {
     if (initialData) {
-      console.log("ProductFormV2 received initialData:", initialData);
+      // Console log removed for production
       
       try {
         // Safely parse JSON fields that might be strings
@@ -188,9 +188,9 @@ export default function ProductFormV2({ initialData, mode, loading, onSubmit, ca
           homeFeatured: initialData.homeFeatured === "true" || initialData.homeFeatured === true || false
         });
         
-        console.log("Form data set successfully");
+        // Console log removed for production
       } catch (error) {
-        console.error("Error parsing initialData:", error);
+        // Console log removed for production
         // Set safe defaults if parsing fails
         setFormData({
           name: initialData.name || "",
@@ -392,7 +392,7 @@ export default function ProductFormV2({ initialData, mode, loading, onSubmit, ca
 
   // Populate existing images from initialData
   useEffect(() => {
-    console.log("ProductFormV2 - initialData received:", initialData);
+    // Console log removed for production
     
     let images: string[] = [];
     
@@ -403,7 +403,7 @@ export default function ProductFormV2({ initialData, mode, loading, onSubmit, ca
         if (img && typeof img.url === 'string') return img.url;
         return null;
       }).filter(Boolean);
-      console.log("Found images in 'images' field:", images);
+      // Console log removed for production
     }
     
     // Fallback to imageGallery if no images found
@@ -413,16 +413,16 @@ export default function ProductFormV2({ initialData, mode, loading, onSubmit, ca
         if (img && typeof img.url === 'string') return img.url;
         return null;
       }).filter(Boolean);
-      console.log("Found images in 'imageGallery' field:", images);
+      // Console log removed for production
     }
     
     // Final fallback to imageUrl
     if (images.length === 0 && initialData?.imageUrl) {
       images = [initialData.imageUrl];
-      console.log("Found image in 'imageUrl' field:", images);
+      // Console log removed for production
     }
     
-    console.log("Final existing images array:", images);
+    // Console log removed for production
     setExistingImages(images);
     
     // Also update formData.imageGallery to keep them in sync
@@ -526,9 +526,9 @@ export default function ProductFormV2({ initialData, mode, loading, onSubmit, ca
     e.preventDefault();
 
     try {
-      console.log("Form submission - formData:", formData);
-      console.log("Form submission - existingImages:", existingImages);
-      console.log("Form submission - uploadingImages:", uploadingImages);
+      // Console log removed for production
+      // Console log removed for production
+      // Console log removed for production
       
       const formDataToSubmit = new FormData();
 
@@ -574,15 +574,15 @@ export default function ProductFormV2({ initialData, mode, loading, onSubmit, ca
            });
 
       // Debug: Log what's being sent
-      console.log("FormData contents being sent:");
+      // Console log removed for production
       for (let [key, value] of formDataToSubmit.entries()) {
-        console.log(`${key}:`, value);
+        // Console log removed for production
       }
 
       // Call onSubmit with formDataToSubmit
       await onSubmit(formDataToSubmit);
     } catch (error) {
-      console.error('Error submitting product form:', error);
+      // Console log removed for production
       toast({
         title: 'Error',
         description: 'Failed to submit product form. Please try again.',

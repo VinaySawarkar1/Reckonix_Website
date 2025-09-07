@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { Building, MapPin, Eye, Flag, Users } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { useMediaSettings, type MediaSettings } from "@/hooks/use-media-settings";
 import SEO from "../components/seo";
 
 export default function About() {
@@ -15,6 +16,8 @@ export default function About() {
       return response.json();
     },
   });
+
+  const { data: mediaSettings } = useMediaSettings() as { data: MediaSettings | undefined };
 
   return (
     <>
@@ -73,7 +76,7 @@ export default function About() {
               transition={{ duration: 0.6 }}
             >
               <img 
-                src="https://images.unsplash.com/photo-1542744173-8e7e53415bb0?q=80&w=870&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D" 
+                src={mediaSettings?.aboutPageImage || "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?q=80&w=870&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"} 
                 alt="Reckonix manufacturing facility" 
                 className="rounded-xl shadow-lg w-full h-auto" 
                 onError={(e) => {
@@ -208,34 +211,45 @@ export default function About() {
               teamMembers.map((member: any, index: number) => (
                 <motion.div 
                   key={member.id}
-                  className="bg-gray-50 rounded-xl p-6 text-center hover:shadow-lg transition-all"
+                  className="bg-gray-50 rounded-xl p-6 hover:shadow-lg transition-all"
                   initial={{ opacity: 0, y: 30 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ duration: 0.6, delay: index * 0.1 }}
                 >
-                  {member.photoUrl ? (
-                    <img 
-                      src={member.photoUrl} 
-                      alt={member.name}
-                      className="w-24 h-24 rounded-full mx-auto mb-4 object-cover"
-                      onError={(e) => {
-                        const img = e.target as HTMLImageElement;
-                        img.style.display = 'none';
-                        // Show fallback div
-                        const fallback = img.nextElementSibling as HTMLElement;
-                        if (fallback) fallback.style.display = 'flex';
-                      }}
-                    />
-                  ) : null}
-                  {/* Fallback div when image fails to load or doesn't exist */}
-                  <div className={`w-24 h-24 rounded-full mx-auto mb-4 bg-gray-200 flex items-center justify-center ${member.photoUrl ? 'hidden' : 'flex'}`}>
-                    <Users className="h-12 w-12 text-gray-400" />
+                  {/* Centered Photo */}
+                  <div className="text-center mb-4">
+                    {member.photoUrl ? (
+                      <img 
+                        src={member.photoUrl} 
+                        alt={member.name}
+                        className="w-24 h-24 rounded-full mx-auto mb-4 object-cover"
+                        onError={(e) => {
+                          const img = e.target as HTMLImageElement;
+                          img.style.display = 'none';
+                          // Show fallback div
+                          const fallback = img.nextElementSibling as HTMLElement;
+                          if (fallback) fallback.style.display = 'flex';
+                        }}
+                      />
+                    ) : null}
+                    {/* Fallback div when image fails to load or doesn't exist */}
+                    <div className={`w-24 h-24 rounded-full mx-auto mb-4 bg-gray-200 flex items-center justify-center ${member.photoUrl ? 'hidden' : 'flex'}`}>
+                      <Users className="h-12 w-12 text-gray-400" />
+                    </div>
                   </div>
-                  <h3 className="font-semibold text-lg text-gray-900 mb-2">{member.name}</h3>
-                  <p className="text-maroon-500 font-medium">{member.role}</p>
+
+                  {/* Centered Name and Role */}
+                  <div className="text-center mb-4">
+                    <h3 className="font-semibold text-lg text-gray-900 mb-2">{member.name}</h3>
+                    <p className="text-maroon-500 font-medium">{member.role}</p>
+                  </div>
+
+                  {/* Left-aligned Bio */}
                   {member.bio && (
-                    <p className="text-gray-600 text-sm mt-2">{member.bio}</p>
+                    <div className="text-left">
+                      <p className="text-gray-600 text-sm leading-relaxed">{member.bio}</p>
+                    </div>
                   )}
                 </motion.div>
               ))

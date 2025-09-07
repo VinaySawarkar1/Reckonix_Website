@@ -148,7 +148,7 @@ export default function EventDetail() {
                   {event.imageUrl && (
                     <div className="mb-8">
                       <img 
-                        src={event.imageUrl} 
+                        src={`${event.imageUrl}?v=${(event as any)._id || event.createdAt || Date.now()}`}
                         alt={event.title}
                         className="w-full h-64 md:h-96 object-cover rounded-xl shadow-lg"
                       />

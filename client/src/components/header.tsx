@@ -34,7 +34,7 @@ export default function Header() {
     { name: "Home", href: "/", icon: <HomeIcon className="h-5 w-5 mr-2 text-primary" /> },
     { name: "About", href: "/about", icon: <Info className="h-5 w-5 mr-2 text-primary" /> },
     { name: "Contact", href: "/contact", icon: <Mail className="h-5 w-5 mr-2 text-primary" /> },
-    { name: "Customers", href: "/customers", icon: <Users className="h-5 w-5 mr-2 text-primary" /> },
+    { name: "Industries", href: "/industries", icon: <Building className="h-5 w-5 mr-2 text-primary" /> },
     { name: "Gallery", href: "/gallery", icon: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-2 text-primary"><path strokeLinecap="round" strokeLinejoin="round" d="M3 7.5V6a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 6v12a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 18V7.5zm0 0L8.25 12.75a2.25 2.25 0 0 0 3.18 0l2.07-2.07a2.25 2.25 0 0 1 3.18 0L21 15.75" /></svg> },
     { name: "Career", href: "/career", icon: <Users className="h-5 w-5 mr-2 text-primary" /> },
     { name: "Cart", href: "/cart", icon: <ShoppingCart className="h-5 w-5 mr-2 text-primary" /> },
@@ -118,15 +118,19 @@ export default function Header() {
                               All Products
                             </Link>
                             {categories.map((category, idx) => (
-                              <button
+                              <Link
                                 key={category.id}
+                                href={`/products?category=${encodeURIComponent(category.name)}`}
                                 className={`w-full text-left px-4 py-2 text-sm font-medium transition-colors border-b border-gray-100 ${idx===activeCatIdx? 'bg-gray-100 text-primary' : 'text-gray-700 hover:bg-gray-50 hover:text-primary'}`}
                                 onMouseEnter={() => setActiveCatIdx(idx)}
                                 onFocus={() => setActiveCatIdx(idx)}
-                                onClick={() => setActiveCatIdx(idx)}
+                                onClick={() => {
+                                  setActiveCatIdx(idx);
+                                  setProductsDropdownOpen(false);
+                                }}
                               >
                                 {category.name}
-                              </button>
+                              </Link>
                             ))}
                           </div>
                           {/* Right: Subcategories as a separate card, absolutely positioned to the right of the first card */}
@@ -250,9 +254,13 @@ export default function Header() {
                 {/* Category Links */}
                 {categories.map((category) => (
                   <div key={category.id} className="border-t border-gray-100">
-                    <div className="px-6 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                    <Link
+                      href={`/products?category=${encodeURIComponent(category.name)}`}
+                      className="block px-6 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide hover:text-primary hover:bg-gray-50 transition-colors"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
                       {category.name}
-                    </div>
+                    </Link>
                     {category.subcategories && category.subcategories.length > 0 && (
                       <div className="pl-6">
                         {category.subcategories.map((subcategory, index) => {

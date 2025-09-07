@@ -7,6 +7,7 @@ import { useCategories } from '@/context/category-context';
 
 interface Product {
   id: number;
+  _id?: string; // MongoDB ObjectId
   name: string;
   category: string;
   subcategory: string;
@@ -17,7 +18,7 @@ interface Product {
 
 interface ProductReorderProps {
   products: Product[];
-  onReorder: (updates: { id: number; rank: number }[]) => void;
+  onReorder: (updates: { id: string | number; rank: number }[]) => void;
   loading?: boolean;
 }
 
@@ -29,10 +30,12 @@ const ProductReorder: React.FC<ProductReorderProps> = ({ products, onReorder, lo
   // Group products by category and sort by rank
   useEffect(() => {
     const grouped = products.reduce((acc, product) => {
-      if (!acc[product.category]) {
-        acc[product.category] = [];
+      // Handle undefined/null categories
+      const category = product.category || 'Uncategorized';
+      if (!acc[category]) {
+        acc[category] = [];
       }
-      acc[product.category].push(product);
+      acc[category].push(product);
       return acc;
     }, {} as Record<string, Product[]>);
 
@@ -44,8 +47,10 @@ const ProductReorder: React.FC<ProductReorderProps> = ({ products, onReorder, lo
     setGroupedProducts(grouped);
   }, [products]);
 
-  const handleDragStart = (e: React.DragEvent, productId: number) => {
-    e.dataTransfer.setData('text/plain', productId.toString());
+  const handleDragStart = (e: React.DragEvent, productId: number | string) => {
+    if (productId !== undefined && productId !== null) {
+      e.dataTransfer.setData('text/plain', productId.toString());
+    }
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -83,17 +88,36 @@ const ProductReorder: React.FC<ProductReorderProps> = ({ products, onReorder, lo
   };
 
   const handleSave = () => {
-    const updates: { id: number; rank: number }[] = [];
+    const updates: { id: string | number; rank: number }[] = [];
     Object.values(groupedProducts).forEach(categoryProducts => {
       categoryProducts.forEach(product => {
-        if (typeof product.id === 'number' && !isNaN(product.id)) {
-          updates.push({ id: product.id, rank: product.rank });
+        // Handle both numeric id and MongoDB _id
+        const productId = product.id || product._id;
+        
+        // Skip products with invalid IDs (undefined, null, empty string)
+        if (!productId || productId === undefined || productId === null || productId === '') {
+          // Console log removed for production
+          return;
+        }
+        
+        // Only include products with valid IDs and ranks
+        if ((typeof productId === 'number' && !isNaN(productId)) || 
+            (typeof productId === 'string' && productId.length > 0)) {
+          const rank = typeof product.rank === 'number' ? product.rank : 0;
+          updates.push({ id: productId, rank });
         } else {
-          console.warn('Invalid product id:', product);
+          // Console log removed for production
         }
       });
     });
 
+    // Console log removed for production
+    
+    if (updates.length === 0) {
+      // Console log removed for production
+      return;
+    }
+    
     onReorder(updates);
     setHasChanges(false);
   };
@@ -152,30 +176,45 @@ const ProductReorder: React.FC<ProductReorderProps> = ({ products, onReorder, lo
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
-                {categoryProducts.map((product, index) => (
-                  <div
-                    key={product.id}
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, product.id)}
-                    onDragOver={handleDragOver}
-                    onDrop={(e) => handleDrop(e, product.id, category)}
-                    className="flex items-center gap-3 p-3 border rounded-lg bg-white hover:bg-gray-50 cursor-move transition-colors"
-                  >
-                    <GripVertical className="h-4 w-4 text-gray-400" />
-                    <div className="flex items-center gap-3 flex-1">
-                      <img
-                        src={product.imageUrl}
-                        alt={product.name}
-                        className="h-10 w-10 rounded object-cover"
-                      />
-                      <div className="flex-1">
-                        <div className="font-medium">{product.name}</div>
-                        <div className="text-sm text-gray-500">{product.shortDescription}</div>
+                {categoryProducts.map((product, index) => {
+                  const productId = product.id || product._id;
+                  const hasValidId = productId && productId !== undefined && productId !== null && productId !== '';
+                  const isDraggable = hasValidId && (typeof productId === 'number' || typeof productId === 'string');
+                  
+                  return (
+                    <div
+                      key={product.id || product._id}
+                      draggable={isDraggable}
+                      onDragStart={isDraggable ? (e) => handleDragStart(e, productId) : undefined}
+                      onDragOver={isDraggable ? handleDragOver : undefined}
+                      onDrop={isDraggable ? (e) => handleDrop(e, productId, category) : undefined}
+                      className={`flex items-center gap-3 p-3 border rounded-lg transition-colors ${
+                        isDraggable 
+                          ? 'bg-white hover:bg-gray-50 cursor-move' 
+                          : 'bg-gray-100 cursor-not-allowed opacity-60'
+                      }`}
+                    >
+                      <GripVertical className={`h-4 w-4 ${isDraggable ? 'text-gray-400' : 'text-gray-300'}`} />
+                      <div className="flex items-center gap-3 flex-1">
+                        <img
+                          src={product.imageUrl}
+                          alt={product.name}
+                          className="h-10 w-10 rounded object-cover"
+                        />
+                        <div className="flex-1">
+                          <div className="font-medium">{product.name}</div>
+                          <div className="text-sm text-gray-500">{product.shortDescription}</div>
+                          {!hasValidId && (
+                            <div className="text-xs text-red-500 mt-1">
+                              ⚠️ Cannot reorder - Invalid ID
+                            </div>
+                          )}
+                        </div>
                       </div>
+                      <Badge variant={isDraggable ? "outline" : "secondary"}>#{index + 1}</Badge>
                     </div>
-                    <Badge variant="outline">#{index + 1}</Badge>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </CardContent>
           </Card>

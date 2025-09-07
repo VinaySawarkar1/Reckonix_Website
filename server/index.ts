@@ -4,8 +4,8 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import path from "path";
 
-console.log('CWD:', process.cwd());
-console.log('MONGODB_URL:', process.env.MONGODB_URL);
+// Console log removed for production);
+// Console log removed for production
 
 const app = express();
 app.use(express.json());
@@ -13,6 +13,9 @@ app.use(express.urlencoded({ extended: false }));
 
 // Serve uploads directory for product images
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+
+// Serve client public directory for media files (videos, images)
+app.use(express.static(path.join(process.cwd(), 'client/public')));
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -37,7 +40,7 @@ app.use((req, res, next) => {
         logLine = logLine.slice(0, 79) + "…";
       }
 
-      console.log(logLine);
+      // Console log removed for production
     }
   });
 
@@ -70,6 +73,6 @@ app.use((req, res, next) => {
     port,
     host: "0.0.0.0", // Allow external connections
   }, () => {
-    console.log(`serving on port ${port}`);
+    // Console log removed for production
   });
 })();

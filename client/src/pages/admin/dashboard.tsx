@@ -36,6 +36,7 @@ import type { Product, QuoteRequest, ContactMessage } from "../../../../shared/s
 import ProductFormV2 from "./product-form-v2";
 import CategoryManagement from "./category-management";
 import ProductReorder from "./product-reorder";
+import MediaManagement from "./media-management";
 import { useCategories } from "../../context/category-context";
 
 // Categories will be fetched dynamically from the database
@@ -248,9 +249,9 @@ export default function AdminDashboard() {
   const [applications, setApplications] = useState([]);
 
   // Team management state
-  const [teamMembers, setTeamMembers] = useState([]);
+  const [teamMembers, setTeamMembers] = useState<any[]>([]);
   const [showAddTeamDialog, setShowAddTeamDialog] = useState(false);
-  const [editingTeamMember, setEditingTeamMember] = useState(null);
+  const [editingTeamMember, setEditingTeamMember] = useState<any>(null);
   const [newTeamMember, setNewTeamMember] = useState({
     name: "",
     role: "",
@@ -265,7 +266,6 @@ export default function AdminDashboard() {
   const [newIndustry, setNewIndustry] = useState({ name: '', description: '', icon: '', rank: 0 });
 
   // 2. Add state for testimonials
-  const [testimonials, setTestimonials] = useState([]);
   const [showAddTestimonialDialog, setShowAddTestimonialDialog] = useState(false);
   const [editingTestimonial, setEditingTestimonial] = useState(null);
   const [newTestimonial, setNewTestimonial] = useState({ 
@@ -284,12 +284,6 @@ export default function AdminDashboard() {
       .then(setIndustries);
   }, []);
 
-  // 3. Fetch testimonials
-  useEffect(() => {
-    fetch('/api/testimonials')
-      .then(res => res.json())
-      .then(setTestimonials);
-  }, []);
 
   useEffect(() => {
     fetch('/api/jobs')
@@ -313,7 +307,7 @@ export default function AdminDashboard() {
   // Redirect if not authenticated
   useEffect(() => {
     if (!user) {
-      setLocation("/admin/login");
+      setLocation("/reckonix/team/admin/login");
     }
   }, [user, setLocation]);
 
@@ -362,7 +356,7 @@ export default function AdminDashboard() {
     if (res.ok) {
       setShowAddTestimonialDialog(false);
       setNewTestimonial({ name: '', role: '', company: '', content: '', rating: 5, featured: false });
-      setTestimonials(await (await fetch('/api/testimonials')).json());
+      refetchTestimonials();
     }
   };
 
@@ -370,21 +364,63 @@ export default function AdminDashboard() {
 
   const handleUpdateTestimonial = async () => {
     if (!editingTestimonial) return;
-    const res = await fetch(`/api/testimonials/${editingTestimonial.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(editingTestimonial),
-    });
-    if (res.ok) {
-      setEditingTestimonial(null);
-      setTestimonials(await (await fetch('/api/testimonials')).json());
+    try {
+      const res = await fetch(`/api/testimonials/${editingTestimonial._id || editingTestimonial.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editingTestimonial),
+      });
+      if (res.ok) {
+        setEditingTestimonial(null);
+        refetchTestimonials();
+        toast({
+          title: "Success",
+          description: "Testimonial updated successfully",
+        });
+      } else {
+        const errorData = await res.json();
+        toast({
+          title: "Error",
+          description: `Failed to update testimonial: ${errorData.message || 'Unknown error'}`,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      // Error updating testimonial
+      toast({
+        title: "Error",
+        description: "Failed to update testimonial",
+        variant: "destructive",
+      });
     }
   };
 
-  const handleDeleteTestimonial = async (id: number) => {
+  const handleDeleteTestimonial = async (id: string) => {
     if (!window.confirm('Delete this testimonial?')) return;
-    const res = await fetch(`/api/testimonials/${id}`, { method: 'DELETE' });
-    if (res.ok) setTestimonials(await (await fetch('/api/testimonials')).json());
+    try {
+      const res = await fetch(`/api/testimonials/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        refetchTestimonials();
+        toast({
+          title: "Success",
+          description: "Testimonial deleted successfully",
+        });
+      } else {
+        const errorData = await res.json();
+        toast({
+          title: "Error",
+          description: `Failed to delete testimonial: ${errorData.message || 'Unknown error'}`,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      // Error deleting testimonial
+      toast({
+        title: "Error",
+        description: "Failed to delete testimonial",
+        variant: "destructive",
+      });
+    }
   };
 
   // Fetch data
@@ -394,13 +430,44 @@ export default function AdminDashboard() {
 
   const safeProducts = Array.isArray(products) ? products : [];
 
-  const { data: quotes = [] } = useQuery<QuoteRequest[]>({
+  const { data: quotes = [], isLoading: quotesLoading, error: quotesError } = useQuery<QuoteRequest[]>({
     queryKey: ["/api/quotes"],
+    queryFn: async () => {
+      const response = await fetch('/api/quotes');
+      if (!response.ok) throw new Error('Failed to fetch quotes');
+      return response.json();
+    },
   });
 
-  const { data: messages = [] } = useQuery<ContactMessage[]>({
+  const { data: messages = [], isLoading: messagesLoading, error: messagesError } = useQuery<ContactMessage[]>({
     queryKey: ["/api/messages"],
+    queryFn: async () => {
+      const response = await fetch('/api/messages');
+      if (!response.ok) throw new Error('Failed to fetch messages');
+      return response.json();
+    },
   });
+
+  const { data: testimonials = [], isLoading: testimonialsLoading, error: testimonialsError, refetch: refetchTestimonials } = useQuery<any[]>({
+    queryKey: ["/api/testimonials"],
+    queryFn: async () => {
+      const response = await fetch('/api/testimonials');
+      if (!response.ok) throw new Error('Failed to fetch testimonials');
+      return response.json();
+    },
+  });
+
+  const { data: chatbotSummaries = [], isLoading: chatbotSummariesLoading, error: chatbotSummariesError, refetch: refetchChatbotSummaries } = useQuery<any[]>({
+    queryKey: ["/api/chatbot-summaries"],
+    queryFn: async () => {
+      const response = await fetch('/api/chatbot-summaries');
+      if (!response.ok) throw new Error('Failed to fetch chatbot summaries');
+      return response.json();
+    },
+  });
+
+  // Debug logging
+  // Data loading states handled silently
 
   const { data: analytics } = useQuery({
     queryKey: ["/api/analytics/website-views"],
@@ -561,7 +628,7 @@ export default function AdminDashboard() {
 
   // Update product mutation
   const updateProduct = useMutation({
-    mutationFn: async ({ id, formData }: { id: number; formData: FormData }) => {
+    mutationFn: async ({ id, formData }: { id: string | number; formData: FormData }) => {
       const response = await apiRequestWithFiles("PUT", `/api/products/${id}`, formData);
       return response.json();
     },
@@ -584,7 +651,7 @@ export default function AdminDashboard() {
 
   // Delete product mutation
   const deleteProduct = useMutation({
-    mutationFn: (id: number) => apiRequest("DELETE", `/api/products/${id}`),
+    mutationFn: (id: string | number) => apiRequest("DELETE", `/api/products/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
       toast({
@@ -627,7 +694,7 @@ export default function AdminDashboard() {
 
   const handleLogout = () => {
     logout();
-    setLocation("/admin/login");
+    setLocation("/reckonix/team/admin/login");
   };
 
   // Team member functions
@@ -875,7 +942,7 @@ export default function AdminDashboard() {
   };
 
   const handleEditProduct = (product: any) => {
-    console.log("Editing product:", product);
+    // Editing product
     
     // Ensure all required fields exist with proper defaults
     const normalizedProduct = {
@@ -931,7 +998,7 @@ export default function AdminDashboard() {
       rank: product.rank || 0
     };
     
-    console.log("Normalized product:", normalizedProduct);
+    // Normalized product data
     setEditingProduct(normalizedProduct);
     setEditingSelectedFiles([]);
   };
@@ -975,13 +1042,32 @@ export default function AdminDashboard() {
         formData.append('images', file);
       });
       
-      updateProduct.mutate({ id: editingProduct.id, formData });
+      const productId = editingProduct.id || editingProduct._id;
+      if (!productId) {
+        toast({
+          title: "Error",
+          description: "Cannot update product: Invalid product ID",
+          variant: "destructive",
+        });
+        return;
+      }
+      updateProduct.mutate({ id: productId, formData });
     }
   };
 
-  const handleDeleteProduct = (id: number) => {
+  const handleDeleteProduct = (product: any) => {
+    const productId = product.id || product._id;
+    if (!productId) {
+      toast({
+        title: "Error",
+        description: "Cannot delete product: Invalid product ID",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     if (confirm("Are you sure you want to delete this product?")) {
-      deleteProduct.mutate(id);
+      deleteProduct.mutate(productId);
     }
   };
 
@@ -1276,7 +1362,7 @@ export default function AdminDashboard() {
     }
 
     try {
-      console.log("handleUpdateProductV2 received data:", data);
+      // Updating product with data
       
       let response;
       // Check if there are new images (files) to upload
@@ -1296,14 +1382,11 @@ export default function AdminDashboard() {
       }
 
       if (hasNewImages) {
-        console.log("Using FormData for file upload");
+        // Using FormData for file upload
         
         if (data instanceof FormData) {
           // Data is already FormData, use it directly
-          console.log("FormData contents:");
-          for (let [key, value] of data.entries()) {
-            console.log(`${key}:`, value);
-          }
+          // FormData contents processed
           
           response = await fetch(`/api/products/${editingProduct.id}`, {
             method: "PUT",
@@ -1332,10 +1415,7 @@ export default function AdminDashboard() {
           }
         });
           
-          console.log("Converted FormData contents:");
-          for (let [key, value] of formData.entries()) {
-            console.log(`${key}:`, value);
-          }
+          // Converted FormData contents processed
           
         response = await fetch(`/api/products/${editingProduct.id}`, {
           method: "PUT",
@@ -1343,7 +1423,7 @@ export default function AdminDashboard() {
         });
         }
       } else {
-        console.log("Using JSON for text-only update");
+        // Using JSON for text-only update
         // Send as JSON
         const dataToSend = {
           ...data,
@@ -1374,7 +1454,7 @@ export default function AdminDashboard() {
         throw new Error("Failed to update product");
       }
     } catch (error) {
-      console.error("Error updating product:", error);
+      // Error updating product
       toast({
         title: "Error",
         description: "Failed to update product",
@@ -1383,34 +1463,60 @@ export default function AdminDashboard() {
     }
   }
 
-  async function handleProductReorder(updates: { id: number; rank: number }[]) {
+  async function handleProductReorder(updates: { id: string | number; rank: number }[]) {
     try {
       setReorderLoading(true);
+      // Received product reorder updates
+      
       // Filter out invalid product IDs before sending
-      const validUpdates = updates.filter(u => typeof u.id === 'number' && !isNaN(u.id) && u.id !== null && u.id !== undefined);
-      const invalidUpdates = updates.filter(u => typeof u.id !== 'number' || isNaN(u.id) || u.id === null || u.id === undefined);
+      const validUpdates = updates.filter(u => 
+        (typeof u.id === 'number' && !isNaN(u.id)) || 
+        (typeof u.id === 'string' && u.id.length > 0)
+      );
+      const invalidUpdates = updates.filter(u => 
+        !((typeof u.id === 'number' && !isNaN(u.id)) || 
+        (typeof u.id === 'string' && u.id.length > 0))
+      );
+      
+      // Console log removed for production
+      // Console log removed for production
+      
       if (invalidUpdates.length > 0) {
-        console.warn('Filtered out invalid product IDs from reorder payload:', invalidUpdates);
+        // Console log removed for production
       }
+      
+      if (validUpdates.length === 0) {
+        // Console log removed for production
+        toast({
+          title: "Warning",
+          description: "No valid products found to reorder. Please check that products have valid IDs.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
       const response = await fetch('/api/products/rank', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(validUpdates)
       });
       
+      // Console log removed for production
+      
       if (response.ok) {
-        // Refresh products to get updated order
-        const updatedProducts = await fetch('/api/products').then(res => res.json());
-        setProducts(updatedProducts);
+        // Invalidate and refetch products to get updated order
+        await queryClient.invalidateQueries({ queryKey: ["/api/products"] });
         toast({
           title: "Success",
           description: "Product order updated successfully",
         });
       } else {
-        throw new Error('Failed to update product order');
+        const errorText = await response.text();
+        // Console log removed for production
+        throw new Error(`Failed to update product order: ${response.status} ${errorText}`);
       }
     } catch (error) {
-      console.error('Error updating product order:', error);
+      // Console log removed for production
       toast({
         title: "Error",
         description: "Failed to update product order",
@@ -1969,10 +2075,11 @@ export default function AdminDashboard() {
             <button onClick={() => setActiveTab('catalog')} className={`flex items-center gap-2 px-4 py-2 rounded transition-all ${activeTab === 'catalog' ? 'bg-maroon-500 text-white' : 'hover:bg-green-200 text-green-900'}`}><Download className="inline" /> Catalog</button>
             <button onClick={() => setActiveTab('analytics')} className={`flex items-center gap-2 px-4 py-2 rounded transition-all ${activeTab === 'analytics' ? 'bg-maroon-500 text-white' : 'hover:bg-green-200 text-green-900'}`}><Eye className="inline" /> Analytics</button>
             <button onClick={() => setActiveTab('jobs')} className={`flex items-center gap-2 px-4 py-2 rounded transition-all ${activeTab === 'jobs' ? 'bg-maroon-500 text-white' : 'hover:bg-green-200 text-green-900'}`}><Plus className="inline" /> Jobs</button>
-            <button onClick={() => window.location.href='/admin/chatbot-summaries'} className={`flex items-center gap-2 px-4 py-2 rounded transition-all hover:bg-green-200 text-green-900`}><MessageSquare className="inline" /> Chatbot Summaries</button>
+            <button onClick={() => setActiveTab('chatbot-summaries')} className={`flex items-center gap-2 px-4 py-2 rounded transition-all ${activeTab === 'chatbot-summaries' ? 'bg-maroon-500 text-white' : 'hover:bg-green-200 text-green-900'}`}><MessageSquare className="inline" /> Chatbot Summaries</button>
             <button onClick={() => setActiveTab('gallery')} className={`flex items-center gap-2 px-4 py-2 rounded transition-all ${activeTab === 'gallery' ? 'bg-maroon-500 text-white' : 'hover:bg-green-200 text-green-900'}`}><GripVertical className="inline" /> Gallery</button>
             <button onClick={() => setActiveTab('industries')} className={`flex items-center gap-2 px-4 py-2 rounded transition-all ${activeTab === 'industries' ? 'bg-maroon-500 text-white' : 'hover:bg-green-200 text-green-900'}`}><FolderOpen className="inline" /> Industries</button>
             <button onClick={() => setActiveTab('testimonials')} className={`flex items-center gap-2 px-4 py-2 rounded transition-all ${activeTab === 'testimonials' ? 'bg-maroon-500 text-white' : 'hover:bg-green-200 text-green-900'}`}><Star className="inline" /> Testimonials</button>
+            <button onClick={() => setActiveTab('media')} className={`flex items-center gap-2 px-4 py-2 rounded transition-all ${activeTab === 'media' ? 'bg-maroon-500 text-white' : 'hover:bg-green-200 text-green-900'}`}><Eye className="inline" /> Media</button>
           </aside>
           {/* Main Content */}
           <main className="flex-1 p-8">
@@ -2144,24 +2251,40 @@ export default function AdminDashboard() {
                                 {product.views}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                <div className="flex space-x-2">
-                                  <Button 
-                                    variant="ghost" 
-                                    size="sm"
-                                    onClick={() => handleEditProduct(product)}
-                                    className="text-blue-600 hover:text-blue-900"
-                                  >
-                                    <Edit className="h-4 w-4" />
-                                  </Button>
-                                  <Button 
-                                    variant="ghost" 
-                                    size="sm" 
-                                    className="text-red-600 hover:text-red-900"
-                                    onClick={() => handleDeleteProduct(product.id)}
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </div>
+                                {(() => {
+                                  const productId = product.id || product._id;
+                                  const hasValidId = productId && productId !== undefined && productId !== null && productId !== '';
+                                  
+                                  return (
+                                    <div className="flex space-x-2">
+                                      <Button 
+                                        variant="ghost" 
+                                        size="sm"
+                                        onClick={() => handleEditProduct(product)}
+                                        className={hasValidId ? "text-blue-600 hover:text-blue-900" : "text-gray-400 cursor-not-allowed"}
+                                        disabled={!hasValidId}
+                                        title={hasValidId ? "Edit product" : "Cannot edit - Invalid ID"}
+                                      >
+                                        <Edit className="h-4 w-4" />
+                                      </Button>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        className={hasValidId ? "text-red-600 hover:text-red-900" : "text-gray-400 cursor-not-allowed"}
+                                        onClick={() => handleDeleteProduct(product)}
+                                        disabled={!hasValidId}
+                                        title={hasValidId ? "Delete product" : "Cannot delete - Invalid ID"}
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                      {!hasValidId && (
+                                        <span className="text-xs text-red-500 ml-2">
+                                          ⚠️ Invalid ID
+                                        </span>
+                                      )}
+                                    </div>
+                                  );
+                                })()}
                               </td>
                             </tr>
                           ))}
@@ -2281,7 +2404,7 @@ export default function AdminDashboard() {
                                 <div className="flex items-center">
                                   <img
                                     className="h-10 w-10 rounded-lg object-cover"
-                                    src={event.imageUrl}
+                                    src={`${event.imageUrl}?v=${(event as any)._id || event.createdAt || Date.now()}`}
                                     alt={event.title}
                                   />
                                   <div className="ml-4">
@@ -2705,15 +2828,34 @@ export default function AdminDashboard() {
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                          {quotes.map((quote) => {
-                            let products = [];
-                            try {
-                              products = typeof quote.products === "string" ? JSON.parse(quote.products) : (quote.products || []);
-                            } catch {
-                              products = [];
-                            }
-                            return (
-                            <tr key={quote.id}>
+                          {quotesLoading ? (
+                            <tr>
+                              <td colSpan={5} className="px-6 py-4 text-center text-gray-500">
+                                Loading quotes...
+                              </td>
+                            </tr>
+                          ) : quotesError ? (
+                            <tr>
+                              <td colSpan={5} className="px-6 py-4 text-center text-red-500">
+                                Error loading quotes: {quotesError.message}
+                              </td>
+                            </tr>
+                          ) : quotes.length === 0 ? (
+                            <tr>
+                              <td colSpan={5} className="px-6 py-4 text-center text-gray-500">
+                                No quotes found
+                              </td>
+                            </tr>
+                          ) : (
+                            quotes.map((quote) => {
+                              let products = [];
+                              try {
+                                products = typeof quote.products === "string" ? JSON.parse(quote.products) : (quote.products || []);
+                              } catch {
+                                products = [];
+                              }
+                              return (
+                              <tr key={quote._id || quote.id}>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div>
                                     <div className="text-sm font-medium text-gray-900">{quote.name}</div>
@@ -2733,7 +2875,7 @@ export default function AdminDashboard() {
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <Select
                                   value={quote.status}
-                                  onValueChange={(status) => updateQuoteStatus.mutate({ id: quote.id, status })}
+                                  onValueChange={(status) => updateQuoteStatus.mutate({ id: quote._id || quote.id, status })}
                                 >
                                   <SelectTrigger className="w-32">
                                     <SelectValue />
@@ -2752,7 +2894,8 @@ export default function AdminDashboard() {
                               </td>
                             </tr>
                             );
-                          })}
+                          })
+                          )}
                         </tbody>
                       </table>
                     </div>
@@ -2797,8 +2940,27 @@ export default function AdminDashboard() {
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                          {messages.map((message) => (
-                            <tr key={message.id}>
+                          {messagesLoading ? (
+                            <tr>
+                              <td colSpan={5} className="px-6 py-4 text-center text-gray-500">
+                                Loading messages...
+                              </td>
+                            </tr>
+                          ) : messagesError ? (
+                            <tr>
+                              <td colSpan={5} className="px-6 py-4 text-center text-red-500">
+                                Error loading messages: {messagesError.message}
+                              </td>
+                            </tr>
+                          ) : messages.length === 0 ? (
+                            <tr>
+                              <td colSpan={5} className="px-6 py-4 text-center text-gray-500">
+                                No messages found
+                              </td>
+                            </tr>
+                          ) : (
+                            messages.map((message) => (
+                            <tr key={message._id || message.id}>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div>
                                   <div className="text-sm font-medium text-gray-900">{message.name}</div>
@@ -2825,14 +2987,15 @@ export default function AdminDashboard() {
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => markMessageReplied.mutate({ id: message.id, replied: !message.replied })}
+                                  onClick={() => markMessageReplied.mutate({ id: message._id || message.id, replied: !message.replied })}
                                   className="text-maroon-600 hover:text-maroon-900"
                                 >
                                   {message.replied ? "Mark Unread" : "Mark Replied"}
                                 </Button>
                               </td>
                             </tr>
-                          ))}
+                          ))
+                          )}
                         </tbody>
                       </table>
                     </div>
@@ -3160,84 +3323,63 @@ export default function AdminDashboard() {
                   </Button>
                 </div>
 
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Photo
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Name
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Role
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Bio
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Actions
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {teamMembers.map((member) => (
-                            <tr key={member.id}>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="flex items-center">
-                                  {member.photoUrl ? (
-                                    <img
-                                      className="h-12 w-12 rounded-full object-cover"
-                                      src={member.photoUrl}
-                                      alt={member.name}
-                                    />
-                                  ) : (
-                                    <div className="h-12 w-12 rounded-full bg-gray-200 flex items-center justify-center">
-                                      <UserPlus className="h-6 w-6 text-gray-400" />
-                                    </div>
-                                  )}
-                                </div>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm font-medium text-gray-900">{member.name}</div>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <Badge variant="outline">{member.role}</Badge>
-                              </td>
-                              <td className="px-6 py-4">
-                                <div className="text-sm text-gray-500 max-w-xs truncate">
-                                  {member.bio}
-                                </div>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                <div className="flex space-x-2">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => setEditingTeamMember(member)}
-                                  >
-                                    <Edit className="h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleDeleteTeamMember(member.id)}
-                                    className="text-red-600 hover:text-red-700"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </CardContent>
-                </Card>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {teamMembers.map((member) => (
+                    <Card key={member.id} className="relative group hover:shadow-lg transition-all duration-300">
+                      <CardContent className="p-6">
+                        {/* Profile Photo */}
+                        <div className="flex justify-center mb-4">
+                          {member.photoUrl ? (
+                            <img
+                              className="h-24 w-24 rounded-full object-cover border-4 border-gray-200 shadow-lg"
+                              src={`${member.photoUrl}?v=${(member as any)._id || member.createdAt || Date.now()}`}
+                              alt={member.name}
+                            />
+                          ) : (
+                            <div className="h-24 w-24 rounded-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center border-4 border-gray-200 shadow-lg">
+                              <UserPlus className="h-12 w-12 text-gray-400" />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Name and Role */}
+                        <div className="text-center mb-4">
+                          <h3 className="text-xl font-bold text-gray-900 mb-1">{member.name}</h3>
+                          <p className="text-red-600 font-semibold">{member.role}</p>
+                        </div>
+
+                        {/* Bio */}
+                        <div className="mb-4">
+                          <p className="text-sm text-gray-600 text-left leading-relaxed">
+                            {member.bio || <span className="text-gray-400 italic">No bio provided</span>}
+                          </p>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="flex justify-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setEditingTeamMember(member)}
+                            className="hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-colors"
+                          >
+                            <Edit className="h-4 w-4 mr-1" />
+                            Edit
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeleteTeamMember(member.id)}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50 hover:border-red-300 transition-colors"
+                          >
+                            <Trash2 className="h-4 w-4 mr-1" />
+                            Delete
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
               </TabsContent>
 
               {/* Catalog Tab */}
@@ -3608,44 +3750,52 @@ export default function AdminDashboard() {
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
-                        {testimonials.map((testimonial) => (
-                          <tr key={testimonial.id}>
-                            <td className="px-4 py-2 font-semibold">{testimonial.name}</td>
-                            <td className="px-4 py-2">{testimonial.role}</td>
-                            <td className="px-4 py-2">{testimonial.company}</td>
-                            <td className="px-4 py-2">
-                              <div className="flex items-center">
-                                {Array.from({ length: testimonial.rating }).map((_, i) => (
-                                  <Star key={i} className="h-4 w-4 text-yellow-400 fill-current" />
-                                ))}
-                              </div>
-                            </td>
-                            <td className="px-4 py-2">
-                              {testimonial.featured ? (
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                  Featured
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                  Regular
-                                </span>
-                              )}
-                            </td>
-                            <td className="px-4 py-2 max-w-xs">
-                              <div className="truncate" title={testimonial.content}>
-                                {testimonial.content}
-                              </div>
-                            </td>
-                            <td className="px-4 py-2 flex gap-2">
-                              <Button size="sm" variant="outline" onClick={() => handleEditTestimonial(testimonial)}>
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button size="sm" variant="destructive" onClick={() => handleDeleteTestimonial(testimonial.id)}>
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </td>
-                          </tr>
-                        ))}
+                        {testimonialsLoading ? (
+                          <tr><td colSpan={7} className="px-4 py-8 text-center">Loading testimonials...</td></tr>
+                        ) : testimonialsError ? (
+                          <tr><td colSpan={7} className="px-4 py-8 text-center text-red-600">Error: {testimonialsError.message}</td></tr>
+                        ) : testimonials.length === 0 ? (
+                          <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">No testimonials found</td></tr>
+                        ) : (
+                          testimonials.map((testimonial) => (
+                            <tr key={testimonial._id || testimonial.id}>
+                              <td className="px-4 py-2 font-semibold">{testimonial.name}</td>
+                              <td className="px-4 py-2">{testimonial.role}</td>
+                              <td className="px-4 py-2">{testimonial.company}</td>
+                              <td className="px-4 py-2">
+                                <div className="flex items-center">
+                                  {Array.from({ length: testimonial.rating }).map((_, i) => (
+                                    <Star key={i} className="h-4 w-4 text-yellow-400 fill-current" />
+                                  ))}
+                                </div>
+                              </td>
+                              <td className="px-4 py-2">
+                                {testimonial.featured ? (
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                    Featured
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                    Regular
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-4 py-2 max-w-xs">
+                                <div className="truncate" title={testimonial.content}>
+                                  {testimonial.content}
+                                </div>
+                              </td>
+                              <td className="px-4 py-2 flex gap-2">
+                                <Button size="sm" variant="outline" onClick={() => handleEditTestimonial(testimonial)}>
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button size="sm" variant="destructive" onClick={() => handleDeleteTestimonial(testimonial._id || testimonial.id)}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </td>
+                            </tr>
+                          ))
+                        )}
                       </tbody>
                     </table>
                   </CardContent>
@@ -3777,6 +3927,55 @@ export default function AdminDashboard() {
                   </div>
                 </div>
               </TabsContent>
+
+              {/* Chatbot Summaries Tab */}
+              <TabsContent value="chatbot-summaries" className="space-y-6">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-2xl font-bold text-gray-900">Chatbot Summaries</h2>
+                  <Button className="bg-green-600 hover:bg-green-700 text-white" onClick={() => refetchChatbotSummaries()}>
+                    <Download className="mr-2 h-4 w-4" /> Refresh
+                  </Button>
+                </div>
+                <Card>
+                  <CardContent className="p-6">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead>
+                        <tr>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Message</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {chatbotSummariesLoading ? (
+                          <tr><td colSpan={5} className="px-4 py-8 text-center">Loading chatbot summaries...</td></tr>
+                        ) : chatbotSummariesError ? (
+                          <tr><td colSpan={5} className="px-4 py-8 text-center text-red-600">Error: {chatbotSummariesError.message}</td></tr>
+                        ) : chatbotSummaries.length === 0 ? (
+                          <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-500">No chatbot summaries found</td></tr>
+                        ) : (
+                          chatbotSummaries.map((summary) => (
+                            <tr key={summary.sessionId || summary._id || summary.createdAt}>
+                              <td className="px-4 py-2 text-sm text-gray-700">{new Date(summary.createdAt).toLocaleString()}</td>
+                              <td className="px-4 py-2 text-sm capitalize text-primary font-semibold">{summary.type ? summary.type.replace("_", " ") : "-"}</td>
+                              <td className="px-4 py-2 text-sm text-gray-700">{summary.name || "-"}</td>
+                              <td className="px-4 py-2 text-sm text-gray-700">{summary.email || "-"}</td>
+                              <td className="px-4 py-2 text-sm text-gray-900 max-w-xs break-words">{summary.message}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* Media Management Tab */}
+              <TabsContent value="media" className="space-y-6">
+                <MediaManagement />
+              </TabsContent>
             </Tabs>
           </main>
         </div>
@@ -3784,56 +3983,68 @@ export default function AdminDashboard() {
 
       {/* Add Team Member Dialog */}
       <div className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 ${showAddTeamDialog ? '' : 'hidden'}`}>
-        <div className="bg-white rounded-lg p-6 w-full max-w-md">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold">Add Team Member</h3>
+        <div className="bg-white rounded-xl p-8 w-full max-w-lg shadow-2xl">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-2xl font-bold text-gray-900">Add Team Member</h3>
             <button
-              className="text-gray-400 hover:text-gray-600"
+              className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-full hover:bg-gray-100"
               onClick={() => setShowAddTeamDialog(false)}
             >
               <X className="h-6 w-6" />
             </button>
           </div>
-          <div className="space-y-4">
+          <div className="space-y-6">
             <div>
-              <label className="block text-sm font-medium mb-1">Name</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Name *</label>
               <Input
                 value={newTeamMember.name}
                 onChange={(e) => setNewTeamMember(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="Enter name"
+                placeholder="Enter full name"
+                className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Role</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Role *</label>
               <Input
                 value={newTeamMember.role}
                 onChange={(e) => setNewTeamMember(prev => ({ ...prev, role: e.target.value }))}
-                placeholder="Enter role"
+                placeholder="e.g., CEO, Developer, Designer"
+                className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Bio</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Bio</label>
               <Textarea
                 value={newTeamMember.bio}
                 onChange={(e) => setNewTeamMember(prev => ({ ...prev, bio: e.target.value }))}
-                placeholder="Enter bio"
-                rows={3}
+                placeholder="Enter a brief description of the team member's background and expertise..."
+                rows={4}
+                className="border-gray-300 focus:border-blue-500 focus:ring-blue-500 resize-none"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Photo</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Profile Photo</label>
               <Input
                 type="file"
                 accept="image/*"
                 onChange={(e) => handlePhotoChange(e, false)}
+                className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
               />
+              <p className="text-xs text-gray-500 mt-1">Recommended: Square image, at least 400x400px</p>
             </div>
-            <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={() => setShowAddTeamDialog(false)}>
+            <div className="flex justify-end space-x-3 pt-4">
+              <Button 
+                variant="outline" 
+                onClick={() => setShowAddTeamDialog(false)}
+                className="px-6 py-2"
+              >
                 Cancel
               </Button>
-              <Button onClick={handleAddTeamMember}>
-                Add Member
+              <Button 
+                onClick={handleAddTeamMember}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2"
+              >
+                Add Team Member
               </Button>
             </div>
           </div>
@@ -3843,66 +4054,81 @@ export default function AdminDashboard() {
       {/* Edit Team Member Dialog */}
       {editingTeamMember && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Edit Team Member</h3>
+          <div className="bg-white rounded-xl p-8 w-full max-w-lg shadow-2xl">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-2xl font-bold text-gray-900">Edit Team Member</h3>
               <button
-                className="text-gray-400 hover:text-gray-600"
+                className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-full hover:bg-gray-100"
                 onClick={() => setEditingTeamMember(null)}
               >
                 <X className="h-6 w-6" />
               </button>
             </div>
-            <div className="space-y-4">
+            <div className="space-y-6">
               <div>
-                <label className="block text-sm font-medium mb-1">Name</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Name *</label>
                 <Input
                   value={editingTeamMember.name}
                   onChange={(e) => setEditingTeamMember(prev => ({ ...prev, name: e.target.value }))}
-                  placeholder="Enter name"
+                  placeholder="Enter full name"
+                  className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Role</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Role *</label>
                 <Input
                   value={editingTeamMember.role}
                   onChange={(e) => setEditingTeamMember(prev => ({ ...prev, role: e.target.value }))}
-                  placeholder="Enter role"
+                  placeholder="e.g., CEO, Developer, Designer"
+                  className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Bio</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Bio</label>
                 <Textarea
                   value={editingTeamMember.bio}
                   onChange={(e) => setEditingTeamMember(prev => ({ ...prev, bio: e.target.value }))}
-                  placeholder="Enter bio"
-                  rows={3}
+                  placeholder="Enter a brief description of the team member's background and expertise..."
+                  rows={4}
+                  className="border-gray-300 focus:border-blue-500 focus:ring-blue-500 resize-none"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Photo</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Profile Photo</label>
                 <Input
                   type="file"
                   accept="image/*"
                   onChange={(e) => handlePhotoChange(e, true)}
+                  className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                 />
                 {editingTeamMember.photoUrl && (
-                  <div className="mt-2">
+                  <div className="mt-3 flex items-center space-x-4">
                     <img 
-                      src={editingTeamMember.photoUrl} 
+                      src={`${editingTeamMember.photoUrl}?v=${(editingTeamMember as any)._id || editingTeamMember.createdAt || Date.now()}`}
                       alt="Current photo" 
-                      className="h-16 w-16 rounded-full object-cover"
+                      className="h-20 w-20 rounded-full object-cover border-2 border-gray-200 shadow-sm"
                     />
-                    <p className="text-xs text-gray-500 mt-1">Current photo</p>
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Current photo</p>
+                      <p className="text-xs text-gray-500">Upload a new image to replace</p>
+                    </div>
                   </div>
                 )}
+                <p className="text-xs text-gray-500 mt-1">Recommended: Square image, at least 400x400px</p>
               </div>
-              <div className="flex justify-end space-x-2">
-                <Button variant="outline" onClick={() => setEditingTeamMember(null)}>
+              <div className="flex justify-end space-x-3 pt-4">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setEditingTeamMember(null)}
+                  className="px-6 py-2"
+                >
                   Cancel
                 </Button>
-                <Button onClick={() => handleUpdateTeamMember(editingTeamMember.id)}>
-                  Update Member
+                <Button 
+                  onClick={() => handleUpdateTeamMember(editingTeamMember.id)}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2"
+                >
+                  Update Team Member
                 </Button>
               </div>
             </div>

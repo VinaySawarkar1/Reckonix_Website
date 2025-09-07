@@ -21,7 +21,7 @@ export const fetchCategories = async (): Promise<Category[]> => {
     // Return raw data for category management, let the component handle transformation
     return data;
   } catch (error) {
-    console.error('Error fetching categories:', error);
+    // Console log removed for production
     return [];
   }
 };

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Media Files Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 20px; border: 1px solid #ccc; border-radius: 8px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        video, img { max-width: 100%; height: auto; }
+        .status { font-weight: bold; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Media Files Test</h1>
+    
+    <div class="test-section" id="hero-video-test">
+        <div class="status">Testing Hero Video...</div>
+        <video id="hero-video" controls style="width: 400px; height: 225px;">
+            <source src="/hero-video-1757263934995-943177827.mp4" type="video/mp4">
+            Your browser does not support the video tag.
+        </video>
+    </div>
+    
+    <div class="test-section" id="home-about-image-test">
+        <div class="status">Testing Home About Image...</div>
+        <img id="home-about-image" src="/generated-image (1).png" alt="Home About Image" style="width: 400px; height: auto;">
+    </div>
+    
+    <div class="test-section" id="about-page-image-test">
+        <div class="status">Testing About Page Image...</div>
+        <img id="about-page-image" src="/generated-image (1).png" alt="About Page Image" style="width: 400px; height: auto;">
+    </div>
+
+    <script>
+        // Test video loading
+        const heroVideo = document.getElementById('hero-video');
+        const heroVideoTest = document.getElementById('hero-video-test');
+        
+        heroVideo.addEventListener('loadeddata', () => {
+            heroVideoTest.className = 'test-section success';
+            heroVideoTest.querySelector('.status').textContent = '✅ Hero Video: Loaded successfully';
+        });
+        
+        heroVideo.addEventListener('error', () => {
+            heroVideoTest.className = 'test-section error';
+            heroVideoTest.querySelector('.status').textContent = '❌ Hero Video: Failed to load';
+        });
+        
+        // Test image loading
+        const homeAboutImage = document.getElementById('home-about-image');
+        const homeAboutImageTest = document.getElementById('home-about-image-test');
+        
+        homeAboutImage.addEventListener('load', () => {
+            homeAboutImageTest.className = 'test-section success';
+            homeAboutImageTest.querySelector('.status').textContent = '✅ Home About Image: Loaded successfully';
+        });
+        
+        homeAboutImage.addEventListener('error', () => {
+            homeAboutImageTest.className = 'test-section error';
+            homeAboutImageTest.querySelector('.status').textContent = '❌ Home About Image: Failed to load';
+        });
+        
+        const aboutPageImage = document.getElementById('about-page-image');
+        const aboutPageImageTest = document.getElementById('about-page-image-test');
+        
+        aboutPageImage.addEventListener('load', () => {
+            aboutPageImageTest.className = 'test-section success';
+            aboutPageImageTest.querySelector('.status').textContent = '✅ About Page Image: Loaded successfully';
+        });
+        
+        aboutPageImage.addEventListener('error', () => {
+            aboutPageImageTest.className = 'test-section error';
+            aboutPageImageTest.querySelector('.status').textContent = '❌ About Page Image: Failed to load';
+        });
+    </script>
+</body>
+</html>

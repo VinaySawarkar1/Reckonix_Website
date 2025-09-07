@@ -42,7 +42,7 @@ export default function GalleryPage() {
       setImages(allImages);
       setFilteredImages(allImages);
     } catch (error) {
-      console.error("Error fetching gallery images:", error);
+      // Console log removed for production
     } finally {
       setIsLoading(false);
     }
@@ -94,7 +94,7 @@ export default function GalleryPage() {
           url: window.location.href,
         });
       } catch (error) {
-        console.log('Error sharing:', error);
+        // Console log removed for production
       }
     } else {
       // Fallback: copy to clipboard
