@@ -15,9 +15,19 @@ export default function ChatbotSummariesAdmin() {
 
   useEffect(() => {
     fetch("/api/chatbot-summaries")
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error('Failed to fetch chatbot summaries');
+        }
+        return res.json();
+      })
       .then((data) => {
         setSummaries(data);
+        setLoading(false);
+      })
+      .catch(error => {
+        console.error('Error fetching chatbot summaries:', error);
+        setSummaries([]);
         setLoading(false);
       });
   }, []);

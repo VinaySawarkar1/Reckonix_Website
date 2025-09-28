@@ -8,13 +8,13 @@ import SEO from "../components/seo";
 import { Search } from "lucide-react";
 import type { Product } from "../../../shared/schema";
 import { useCategories } from "@/context/category-context";
-import { Gauge, Ruler, Thermometer, Activity, Weight, Microscope, Compass, Wrench, ClipboardList, Layers, ListChecks, BookOpen, FileText, Settings, ChevronDown, ChevronUp, Box, ChevronRight } from "lucide-react";
+import { Gauge, Ruler, Thermometer, Activity, Weight, Microscope, Compass, Wrench, ClipboardList, Layers, ListChecks, BookOpen, FileText, Settings, ChevronDown, ChevronUp, Box, ChevronRight, Code } from "lucide-react";
 import { useRef } from "react";
 import { useLocation, Link } from "wouter";
 
 // Remove hardcoded categories and subcategories. Use dynamic fetch.
 
-// Helper to render nested subcategories as a tree
+// Helper to render nested subcategories as a tree with proper 3-level hierarchy
 function SubcategoryTree({ 
   subcategories, 
   onSelect, 
@@ -24,37 +24,97 @@ function SubcategoryTree({
   onSubSubHover, 
   hoveredSubSub, 
   hoveredSubSubItems 
+}: {
+  subcategories: any[];
+  onSelect: (path: string[]) => void;
+  activeMain: string;
+  activeSub: string;
+  parentPath?: string[];
+  onSubSubHover?: (subcategory: string | null, items: any[]) => void;
+  hoveredSubSub: string | null;
+  hoveredSubSubItems: any[];
 }) {
   return (
-    <ul>
+    <ul className="space-y-1">
       {subcategories.map((sub: any) => {
         const subName = typeof sub === 'string' ? sub : sub.name;
-        const children = sub.subcategories || [];
+        const children = sub.children || [];
         const path = [...parentPath, subName];
         const isActive = activeSub === path.join(' > ');
+        const hasChildren = children.length > 0;
+        
         return (
-          <li key={subName}>
+          <li key={subName} className="relative group">
             <button
-              className={`w-full flex items-center px-2 py-1 rounded text-xs font-medium transition-all duration-200 group ${isActive ? 'bg-maroon-600 text-white' : 'text-black hover:bg-maroon-700 hover:text-white'}`}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 group whitespace-nowrap ${
+                isActive 
+                  ? 'bg-maroon-600 text-white shadow-md' 
+                  : 'text-maroon-200 hover:bg-maroon-700/50 hover:text-white'
+              }`}
               onClick={() => onSelect(path)}
-              onMouseEnter={() => onSubSubHover && onSubSubHover(subName, children)}
-              onMouseLeave={() => onSubSubHover && onSubSubHover(null, [])}
+              onMouseEnter={() => {
+                if (hasChildren && onSubSubHover) {
+                  onSubSubHover(subName, children);
+                }
+              }}
+              onMouseLeave={() => {
+                // Simple delay to allow moving to sub-sub card
+                setTimeout(() => {
+                  if (onSubSubHover) {
+                    onSubSubHover(null, []);
+                  }
+                }, 300);
+              }}
             >
-              {subName}
+              <span className="flex-1 text-left truncate">{subName}</span>
+              {hasChildren && (
+                <ChevronRight className={`h-3 w-3 transition-transform duration-200 ${
+                  isActive ? 'rotate-90' : 'group-hover:rotate-90'
+                }`} />
+              )}
             </button>
-            {/* Recursive rendering for nested subcategories (if not using hover popup) */}
-            {children.length > 0 && !hoveredSubSub && (
-              <div className="ml-4 mt-1">
-                <SubcategoryTree
-                  subcategories={children}
-                  onSelect={onSelect}
-                  activeMain={activeMain}
-                  activeSub={activeSub}
-                  parentPath={path}
-                  onSubSubHover={onSubSubHover}
-                  hoveredSubSub={hoveredSubSub}
-                  hoveredSubSubItems={hoveredSubSubItems}
-                />
+            
+            {/* Sub-sub categories dropdown on hover - COMPLETELY SEPARATE CARD */}
+            {hasChildren && hoveredSubSub === subName && children.length > 0 && parentPath.length === 0 && (
+              <div 
+                className="absolute left-full top-0 ml-2 bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-[220px] max-w-[280px]"
+          onMouseEnter={() => {
+            // Keep visible when hovering over sub-sub card
+          }}
+          onMouseLeave={() => {
+            // Hide when leaving sub-sub card
+            if (onSubSubHover) {
+              onSubSubHover(null, []);
+            }
+          }}
+              >
+                <div className="p-2">
+                  <div className="px-4 pb-1 text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-200">
+                    {subName} - Sub Categories
+                  </div>
+                  <ul className="space-y-1">
+                    {children.map((child: any) => {
+                      const childName = typeof child === 'string' ? child : child.name;
+                      const childPath = [...path, childName];
+                      const isChildActive = activeSub === childPath.join(' > ');
+                      
+                      return (
+                        <li key={childName}>
+                          <button
+                            className={`w-full text-left px-6 py-1.5 text-sm transition-all duration-200 rounded-md ${
+                              isChildActive 
+                                ? 'bg-gray-100 text-primary font-medium' 
+                                : 'text-gray-600 hover:bg-gray-100 hover:text-primary'
+                            }`}
+                            onClick={() => onSelect(childPath)}
+                          >
+                            {childName}
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
               </div>
             )}
           </li>
@@ -86,6 +146,10 @@ export default function Products() {
     name: category.name,
     subcategories: category.subcategories || []
   }));
+  
+  // Debug logging
+  console.log('Categories data:', categories);
+  console.log('Sidebar structure:', sidebar);
   
   // Sidebar selection logic
   const [activeMain, setActiveMain] = useState("");
@@ -155,23 +219,57 @@ export default function Products() {
     // Also ensure state is in sync immediately
     setExpanded({ [activeMain]: true });
   };
-  // Filter products based on sidebar selection (tree path)
+  // Helper function to check if a product matches the selected subcategory path
+  const matchesSubcategoryPath = (product: any, categoryName: string, subcategoryPath: string) => {
+    if (!subcategoryPath) return product.category === categoryName;
+    
+    // Check if product's subcategory matches the selected path
+    // This handles both direct matches and nested sub-sub categories
+    const productSubcategory = product.subcategory || '';
+    
+    // For exact matches
+    if (productSubcategory === subcategoryPath) return true;
+    
+    // For nested paths, check if the product's subcategory is within the selected path
+    // e.g., if selected path is "Calibration Systems > Pressure > Digital", 
+    // and product subcategory is "Pressure > Digital", it should match
+    const pathParts = subcategoryPath.split(' > ');
+    const productParts = productSubcategory.split(' > ');
+    
+    // Check if product's path is a subset of the selected path
+    if (productParts.length <= pathParts.length) {
+      return productParts.every((part: string, index: number) => part === pathParts[index]);
+    }
+    
+    return false;
+  };
+
+  // Filter products based on sidebar selection (tree path) and sort by rank
   const sidebarFilteredProducts = safeProducts.filter(product => {
     if (!activeMain) return true;
     if (activeMain && !activeSub) return product.category === activeMain;
-    // For nested subcategories, match full path
-    return product.category === activeMain && product.subcategory === activeSub;
+    // For nested subcategories, use the helper function
+    return product.category === activeMain && matchesSubcategoryPath(product, activeMain, activeSub);
   }).filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          product.shortDescription.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesSearch;
+  }).sort((a, b) => {
+    // Sort by rank (ascending), then by name if ranks are equal
+    const rankA = a.rank ?? 0;
+    const rankB = b.rank ?? 0;
+    if (rankA !== rankB) {
+      return rankA - rankB;
+    }
+    return a.name.localeCompare(b.name);
   });
 
   // Sidebar icon mapping for main categories (maroon theme)
   const mainIcons = {
-    "Calibration System": (isActive: boolean, isHovered: boolean) => <Gauge className={`inline-block mr-2 h-5 w-5 ${isActive || isHovered ? 'text-white' : 'text-black'}`} />,
-    "Metrology Systems": (isActive: boolean, isHovered: boolean) => <Microscope className={`inline-block mr-2 h-5 w-5 ${isActive || isHovered ? 'text-white' : 'text-black'}`} />,
-    "Measuring Systems": (isActive: boolean, isHovered: boolean) => <Ruler className={`inline-block mr-2 h-5 w-5 ${isActive || isHovered ? 'text-white' : 'text-black'}`} />,
+    "Calibration": (isActive: boolean, isHovered: boolean) => <Gauge className={`inline-block mr-2 h-5 w-5 ${isActive || isHovered ? 'text-white' : 'text-black'}`} />,
+    "Metrology": (isActive: boolean, isHovered: boolean) => <Microscope className={`inline-block mr-2 h-5 w-5 ${isActive || isHovered ? 'text-white' : 'text-black'}`} />,
+    "Measuring": (isActive: boolean, isHovered: boolean) => <Ruler className={`inline-block mr-2 h-5 w-5 ${isActive || isHovered ? 'text-white' : 'text-black'}`} />,
+    "Software": (isActive: boolean, isHovered: boolean) => <Code className={`inline-block mr-2 h-5 w-5 ${isActive || isHovered ? 'text-white' : 'text-black'}`} />,
   };
   // Sidebar icon mapping for subcategories (maroon theme, relevant icons)
   const subIcons: Record<string, (isActive: boolean, isHovered: boolean) => JSX.Element> = {
@@ -211,6 +309,7 @@ export default function Products() {
   const [hoveredSub, setHoveredSub] = useState<string | null>(null);
   const [hoveredSubSub, setHoveredSubSub] = useState<string | null>(null);
   const [hoveredSubSubItems, setHoveredSubSubItems] = useState<any[]>([]);
+  const [showSubSubCard, setShowSubSubCard] = useState(false);
 
   if (isLoading || loading) {
     return (
@@ -308,13 +407,13 @@ export default function Products() {
                       transition={{ duration: 0.3 }}
                       className="overflow-hidden"
                     >
-                      <div className="mt-2 ml-4 space-y-1">
+                      <div className="mt-2 ml-2 space-y-1">
                         <SubcategoryTree
                           subcategories={main.subcategories}
                           onSelect={handleSubcategorySelect}
                           activeMain={activeMain}
                           activeSub={activeSub}
-                          onSubSubHover={(subcategory, items) => {
+                          onSubSubHover={(subcategory: string | null, items: any[]) => {
                             setHoveredSubSub(subcategory);
                             setHoveredSubSubItems(items);
                           }}

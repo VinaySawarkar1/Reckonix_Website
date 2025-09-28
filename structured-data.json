@@ -1,0 +1,67 @@
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "Reckonix",
+  "url": "https://reckonix.co.in",
+  "logo": "https://reckonix.co.in/uploads/logo.png",
+  "description": "Leading calibration services and precision measurement equipment provider in India. ISO certified calibration lab serving automotive, aerospace, pharmaceutical industries.",
+  "address": {
+    "@type": "PostalAddress",
+    "addressCountry": "IN",
+    "addressRegion": "India"
+  },
+  "contactPoint": {
+    "@type": "ContactPoint",
+    "telephone": "+91-XXXXXXXXXX",
+    "contactType": "customer service",
+    "areaServed": "IN",
+    "availableLanguage": "English"
+  },
+  "sameAs": [
+    "https://www.linkedin.com/company/reckonix",
+    "https://www.facebook.com/reckonix",
+    "https://twitter.com/reckonix"
+  ],
+  "hasOfferCatalog": {
+    "@type": "OfferCatalog",
+    "name": "Calibration Services",
+    "itemListElement": [
+      {
+        "@type": "Offer",
+        "itemOffered": {
+          "@type": "Service",
+          "name": "Multifunction Calibrator Services",
+          "description": "Professional calibration services for multifunction calibrators"
+        }
+      },
+      {
+        "@type": "Offer",
+        "itemOffered": {
+          "@type": "Service",
+          "name": "Torque Wrench Calibration",
+          "description": "Precision torque wrench calibration services"
+        }
+      },
+      {
+        "@type": "Offer",
+        "itemOffered": {
+          "@type": "Service",
+          "name": "Vision Measuring Machine Calibration",
+          "description": "Expert calibration for vision measuring machines"
+        }
+      }
+    ]
+  },
+  "serviceArea": {
+    "@type": "GeoCircle",
+    "geoMidpoint": {
+      "@type": "GeoCoordinates",
+      "latitude": "19.0760",
+      "longitude": "72.8777"
+    },
+    "geoRadius": "2000000"
+  }
+}
+
+
+

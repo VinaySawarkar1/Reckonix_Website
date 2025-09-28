@@ -12,8 +12,17 @@ export default function TopNavbar() {
   // Fetch all products once on mount
   useEffect(() => {
     fetch(`/api/products`)
-      .then(res => res.json())
-      .then(data => setAllProducts(Array.isArray(data) ? data : []));
+      .then(res => {
+        if (!res.ok) {
+          throw new Error('Failed to fetch products');
+        }
+        return res.json();
+      })
+      .then(data => setAllProducts(Array.isArray(data) ? data : []))
+      .catch(error => {
+        console.error('Error fetching products:', error);
+        setAllProducts([]);
+      });
   }, []);
 
   useEffect(() => {

@@ -4,21 +4,25 @@ const prisma = new PrismaClient();
 // Categories and subcategories structure
 const categories = [
   {
-    name: "Calibration Systems",
+    name: "Calibration",
     subcategories: [
+      "Pressure Calibrator",
+      "Multifunction Calibrator",
+      "Decade Boxes",
+      "Process Calibrators",
+      "Impedance Standards",
       "Dimension Calibrators",
       "Electrical Calibrators", 
       "Thermal Calibrator",
-      "Pressure Calibrator",
       "Mass and Volume",
       "Flow Calibrator"
     ]
   },
   {
-    name: "Metrology Systems",
+    name: "Metrology",
     subcategories: [
-      "Vision Measuring Machine",
-      "Coordinate Measuring Machine", 
+      "Coordinate Measuring Machine",
+      "Vision Measuring Machine", 
       "Tool Presetter",
       "Optical Comparator",
       "Video Measuring System",
@@ -33,11 +37,27 @@ const categories = [
     ]
   },
   {
-    name: "Measuring Systems",
+    name: "Measuring",
     subcategories: [
       "Dataloggers",
       "Transmitters",
-      "IOT Gateway"
+      "IOT Gateway",
+      "Digital Calipers",
+      "Digital Micrometers",
+      "Dial Indicators",
+      "Digital Indicators",
+      "Angle Measuring Instruments",
+      "Thickness Gauges"
+    ]
+  },
+  {
+    name: "Software",
+    subcategories: [
+      "Calibration Software",
+      "Data Analysis Software",
+      "Quality Management Software",
+      "Measurement Software",
+      "Reporting Software"
     ]
   }
 ];

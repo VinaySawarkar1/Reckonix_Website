@@ -22,6 +22,7 @@ interface ProductImage {
 
 interface ProductFormData {
   name: string;
+  modelNumber: string;
   category: string;
   subcategory: string;
   shortDescription: string;
@@ -67,8 +68,10 @@ const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/web
 export default function ProductFormV2({ initialData, mode, loading, onSubmit, categories = [] }: ProductFormV2Props) {
   const { toast } = useToast();
   const [isInitializing, setIsInitializing] = useState(true);
+  const [hasBeenInitialized, setHasBeenInitialized] = useState(false);
   const [formData, setFormData] = useState<ProductFormData>({
     name: initialData?.name || "",
+    modelNumber: initialData?.modelNumber || "",
     category: initialData?.category || "Calibration Systems",
     subcategory: initialData?.subcategory || "",
     shortDescription: initialData?.shortDescription || "",
@@ -98,39 +101,44 @@ export default function ProductFormV2({ initialData, mode, loading, onSubmit, ca
 
   // Update form data when initialData changes (prevents blank form on edit)
   useEffect(() => {
-    if (initialData) {
+    // Reset initialization flag when initialData changes (different product)
+    if (initialData && hasBeenInitialized) {
+      setHasBeenInitialized(false);
+    }
+    
+    if (initialData && !hasBeenInitialized) {
       // Console log removed for production
       
       try {
         // Safely parse JSON fields that might be strings
-        const safeSpecs = Array.isArray(initialData.specifications) 
-          ? initialData.specifications 
-          : (typeof initialData.specifications === 'string' 
-              ? JSON.parse(initialData.specifications || '[]') 
+        const safeSpecs = Array.isArray(initialData.specifications)
+          ? initialData.specifications
+          : (typeof initialData.specifications === 'string'
+              ? JSON.parse(initialData.specifications || '[]')
               : [{ key: "", value: "" }]);
-              
-        const safeFeatures = Array.isArray(initialData.featuresBenefits) 
-          ? initialData.featuresBenefits 
-          : (typeof initialData.featuresBenefits === 'string' 
-              ? JSON.parse(initialData.featuresBenefits || '[]') 
+
+        const safeFeatures = Array.isArray(initialData.featuresBenefits)
+          ? initialData.featuresBenefits
+          : (typeof initialData.featuresBenefits === 'string'
+              ? JSON.parse(initialData.featuresBenefits || '[]')
               : [""]);
-              
-        const safeApps = Array.isArray(initialData.applications) 
-          ? initialData.applications 
-          : (typeof initialData.applications === 'string' 
-              ? JSON.parse(initialData.applications || '[]') 
+
+        const safeApps = Array.isArray(initialData.applications)
+          ? initialData.applications
+          : (typeof initialData.applications === 'string'
+              ? JSON.parse(initialData.applications || '[]')
               : [""]);
-              
-        const safeCerts = Array.isArray(initialData.certifications) 
-          ? initialData.certifications 
-          : (typeof initialData.certifications === 'string' 
-              ? JSON.parse(initialData.certifications || '[]') 
+
+        const safeCerts = Array.isArray(initialData.certifications)
+          ? initialData.certifications
+          : (typeof initialData.certifications === 'string'
+              ? JSON.parse(initialData.certifications || '[]')
               : [""]);
-              
+
         const safeTechDetails = initialData.technicalDetails && typeof initialData.technicalDetails === 'object'
           ? initialData.technicalDetails
-          : (typeof initialData.technicalDetails === 'string' 
-              ? JSON.parse(initialData.technicalDetails || '{}') 
+          : (typeof initialData.technicalDetails === 'string'
+              ? JSON.parse(initialData.technicalDetails || '{}')
               : {
                   dimensions: "",
                   weight: "",
@@ -139,13 +147,14 @@ export default function ProductFormV2({ initialData, mode, loading, onSubmit, ca
                   warranty: "",
                   compliance: []
                 });
-                
+
         // Handle images from ProductImage collection (primary) and fallback to imageGallery
-        let safeImageGallery: any[] = [];
+        let safeImageGallery: ProductImage[] = [];
+
         if (initialData?.images && Array.isArray(initialData.images)) {
           // Use images from ProductImage collection
           safeImageGallery = initialData.images.map((img: any) => ({
-            id: img._id || Math.random().toString(36).substr(2, 9),
+            id: img._id || img.id || Math.random().toString(36).substr(2, 9),
             url: typeof img === 'string' ? img : img.url,
             isNew: false
           }));
@@ -160,18 +169,34 @@ export default function ProductFormV2({ initialData, mode, loading, onSubmit, ca
           // Parse JSON string
           try {
             const parsed = JSON.parse(initialData.imageGallery || '[]');
-            safeImageGallery = Array.isArray(parsed) ? parsed.map((img: any) => ({
-              id: img.id || Math.random().toString(36).substr(2, 9),
-              url: typeof img === 'string' ? img : img.url,
-              isNew: false
-            })) : [];
+            if (Array.isArray(parsed)) {
+              safeImageGallery = parsed.map((img: any) => ({
+                id: img.id || Math.random().toString(36).substr(2, 9),
+                url: typeof img === 'string' ? img : img.url,
+                isNew: false
+              }));
+            }
           } catch {
             safeImageGallery = [];
           }
         }
+
+        // Final fallback to imageUrl
+        if (safeImageGallery.length === 0 && initialData?.imageUrl) {
+          safeImageGallery = [{
+            id: 'existing-0',
+            url: initialData.imageUrl,
+            isNew: false
+          }];
+        }
+
+        // Set all images (existing + new) - this will be the single source of truth
+        setAllImages(safeImageGallery);
+        setHasBeenInitialized(true);
         
         setFormData({
           name: initialData.name || "",
+          modelNumber: initialData.modelNumber || "",
           category: initialData.category || "Calibration Systems",
           subcategory: initialData.subcategory || "",
           shortDescription: initialData.shortDescription || "",
@@ -181,7 +206,7 @@ export default function ProductFormV2({ initialData, mode, loading, onSubmit, ca
           applications: safeApps,
           certifications: safeCerts,
           imageUrl: initialData.imageUrl || "",
-          imageGallery: safeImageGallery,
+          imageGallery: [], // Initialize as empty - will be synced with allImages
           catalogPdfUrl: initialData.catalogPdfUrl || "",
           datasheetPdfUrl: initialData.datasheetPdfUrl || "",
           technicalDetails: safeTechDetails,
@@ -194,6 +219,7 @@ export default function ProductFormV2({ initialData, mode, loading, onSubmit, ca
         // Set safe defaults if parsing fails
         setFormData({
           name: initialData.name || "",
+          modelNumber: initialData.modelNumber || "",
           category: initialData.category || "Calibration Systems",
           subcategory: initialData.subcategory || "",
           shortDescription: initialData.shortDescription || "",
@@ -222,12 +248,12 @@ export default function ProductFormV2({ initialData, mode, loading, onSubmit, ca
     } else {
       setIsInitializing(false);
     }
-  }, [initialData]);
+  }, [initialData, hasBeenInitialized]);
 
-  const [uploadingImages, setUploadingImages] = useState<ProductImage[]>([]);
 
   // Extract individual state variables for JSX
   const name = formData.name;
+  const modelNumber = formData.modelNumber;
   const category = formData.category;
   const subcategory = formData.subcategory;
   const shortDescription = formData.shortDescription;
@@ -264,6 +290,7 @@ export default function ProductFormV2({ initialData, mode, loading, onSubmit, ca
 
   // Handlers
   const setName = (value: string) => setFormData(prev => ({ ...prev, name: value }));
+  const setModelNumber = (value: string) => setFormData(prev => ({ ...prev, modelNumber: value }));
   const setCategory = (value: string) => setFormData(prev => ({ ...prev, category: value }));
   const setSubcategory = (value: string) => setFormData(prev => ({ ...prev, subcategory: value }));
   const setShortDescription = (value: string) => setFormData(prev => ({ ...prev, shortDescription: value }));
@@ -380,63 +407,34 @@ export default function ProductFormV2({ initialData, mode, loading, onSubmit, ca
         file,
         isNew: true
       }));
-      setUploadingImages(prev => [...prev, ...newImages]);
+      setAllImages(prev => [...prev, ...newImages]);
     }
   };
 
-  const handleRemoveImage = (index: number) => {
-    setUploadingImages(prev => prev.filter((_, i) => i !== index));
+  const handleRemoveImage = (imageId: string) => {
+    setAllImages(prev => {
+      const filtered = prev.filter(img => img.id !== imageId);
+      return filtered;
+    });
   };
 
-  const [existingImages, setExistingImages] = useState<string[]>([]);
-
-  // Populate existing images from initialData
+  // Reset form when switching between products
   useEffect(() => {
-    // Console log removed for production
-    
-    let images: string[] = [];
-    
-    // First, try to get images from the 'images' field (from ProductImage collection)
-    if (initialData?.images && Array.isArray(initialData.images)) {
-      images = initialData.images.map((img: any) => {
-        if (typeof img === 'string') return img;
-        if (img && typeof img.url === 'string') return img.url;
-        return null;
-      }).filter(Boolean);
-      // Console log removed for production
+    if (initialData && mode === 'edit') {
+      setHasBeenInitialized(false);
     }
-    
-    // Fallback to imageGallery if no images found
-    if (images.length === 0 && initialData?.imageGallery && Array.isArray(initialData.imageGallery)) {
-      images = initialData.imageGallery.map((img: any) => {
-        if (typeof img === 'string') return img;
-        if (img && typeof img.url === 'string') return img.url;
-        return null;
-      }).filter(Boolean);
-      // Console log removed for production
-    }
-    
-    // Final fallback to imageUrl
-    if (images.length === 0 && initialData?.imageUrl) {
-      images = [initialData.imageUrl];
-      // Console log removed for production
-    }
-    
-    // Console log removed for production
-    setExistingImages(images);
-    
-    // Also update formData.imageGallery to keep them in sync
+  }, [initialData?._id, initialData?.id, mode]);
+
+  // Single source of truth for all images (existing + new)
+  const [allImages, setAllImages] = useState<ProductImage[]>([]);
+
+  // Keep formData.imageGallery in sync with allImages
+  useEffect(() => {
     setFormData(prev => ({
       ...prev,
-      imageGallery: images.map((url, index) => ({
-        id: `existing-${index}`,
-        url,
-        isNew: false
-      }))
+      imageGallery: allImages
     }));
-  }, [initialData]);
-
-  const imagePreviews: string[] = uploadingImages.map(img => img.url);
+  }, [allImages]);
 
   const onDrop = useCallback((acceptedFiles: File[], rejectedFiles: any[]) => {
     // Handle rejected files
@@ -468,7 +466,8 @@ export default function ProductFormV2({ initialData, mode, loading, onSubmit, ca
       uploadProgress: 0
     }));
 
-    setUploadingImages(prev => [...prev, ...newImages]);
+    // Add new images to allImages
+    setAllImages(prev => [...prev, ...newImages]);
     
     toast({
       title: "Files added",
@@ -485,16 +484,6 @@ export default function ProductFormV2({ initialData, mode, loading, onSubmit, ca
     multiple: true
   });
 
-  const removeImage = (imageId: string, isNew: boolean) => {
-    if (isNew) {
-      setUploadingImages(prev => prev.filter(img => img.id !== imageId));
-    } else {
-      setFormData(prev => ({
-        ...prev,
-        imageGallery: prev.imageGallery.filter(img => img.id !== imageId)
-      }));
-    }
-  };
 
   const handleInputChange = (field: keyof ProductFormData, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -525,64 +514,73 @@ export default function ProductFormV2({ initialData, mode, loading, onSubmit, ca
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Client-side validation for required fields
+    if (!formData.name.trim() || !formData.category.trim() || !formData.shortDescription.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all required fields: Name, Category, and Description",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
-      // Console log removed for production
-      // Console log removed for production
-      // Console log removed for production
-      
       const formDataToSubmit = new FormData();
 
-      // Add all product data
+      // Add all product data (skip imageGallery as it's handled separately)
       Object.entries(formData).forEach(([key, value]) => {
-        if (
-          key === 'specifications' ||
-          key === 'featuresBenefits' ||
-          key === 'applications' ||
-          key === 'certifications' ||
-          key === 'technicalDetails'
-        ) {
-          formDataToSubmit.append(key, JSON.stringify(value));
-        } else if (value !== undefined && value !== null && value !== '') {
-          formDataToSubmit.append(key, value);
+        if (key === 'imageGallery') return; // Handle separately below
+
+        let appendKey = key;
+        if (key === 'shortDescription') {
+          appendKey = 'description';
         }
+
+        let appendValue = value;
+        if (typeof value === 'object' && value !== null) {
+          if (!Array.isArray(value)) {
+            appendValue = JSON.stringify(value);
+          } else {
+            appendValue = JSON.stringify(value);
+          }
+        }
+
+        formDataToSubmit.append(appendKey, appendValue.toString());
       });
 
-      // Add existing images for edit mode (even if empty, to preserve state)
-      if (mode === "edit") {
-        formDataToSubmit.append(
-          'existingImages',
-          JSON.stringify(existingImages)
-        );
-      }
+      // Separate existing images from new images
+      const existingImages = allImages.filter(img => !img.isNew && img.url && img.url.startsWith('/uploads/'));
+      const newImages = allImages.filter(img => img.isNew && img.file);
 
-      // Add image gallery as JSON (for backward compatibility)
-      formDataToSubmit.append(
-        'imageGallery',
-        JSON.stringify(
-          formData.imageGallery.map((img) => ({
-            id: img.id,
-            url: img.url,
-          }))
-        )
-      );
+      // Create imageGallery data with only existing images (no blob URLs)
+      const imageGalleryData = existingImages.map((img) => ({
+        id: img.id,
+        url: img.url,
+        isNew: false
+      }));
 
-                 // Add new images files to formData
-           uploadingImages.forEach((img) => {
-             if (img.file) {
-               formDataToSubmit.append('images', img.file); // Changed from 'newImages' to 'images' to match backend
-             }
-           });
+      // Add new images to imageGallery with placeholder URLs (will be updated by backend)
+      newImages.forEach((img, index) => {
+        imageGalleryData.push({
+          id: img.id,
+          url: `NEW_IMAGE_${index}`, // Placeholder - backend will replace with actual URL
+          isNew: true
+        });
+      });
 
-      // Debug: Log what's being sent
-      // Console log removed for production
-      for (let [key, value] of formDataToSubmit.entries()) {
-        // Console log removed for production
-      }
+      formDataToSubmit.append('imageGallery', JSON.stringify(imageGalleryData));
+
+      // Add new image files to formData
+      newImages.forEach((img) => {
+        if (img.file) {
+          formDataToSubmit.append('images', img.file);
+        }
+      });
 
       // Call onSubmit with formDataToSubmit
       await onSubmit(formDataToSubmit);
     } catch (error) {
-      // Console log removed for production
+      console.error('SUBMIT - Error:', error);
       toast({
         title: 'Error',
         description: 'Failed to submit product form. Please try again.',
@@ -619,6 +617,10 @@ export default function ProductFormV2({ initialData, mode, loading, onSubmit, ca
         <div>
           <label className="block text-sm font-medium mb-1">Product Name</label>
           <Input value={name} onChange={e => setName(e.target.value)} placeholder="Enter product name" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">Model Number</label>
+          <Input value={modelNumber} onChange={e => setModelNumber(e.target.value)} placeholder="Enter model number" />
         </div>
         <div className="flex items-center mt-6">
           <input
@@ -787,59 +789,35 @@ export default function ProductFormV2({ initialData, mode, loading, onSubmit, ca
           className="mb-2"
         />
         
-        {/* Existing Images (Edit Mode) */}
-        {existingImages.length > 0 && (
+        {/* All Images Display */}
+        {allImages.length > 0 && (
           <div className="mb-4">
-            <p className="text-sm text-gray-600 mb-2">Existing Images:</p>
+            <p className="text-sm text-gray-600 mb-2">Product Images ({allImages.length}):</p>
             <div className="flex gap-2 flex-wrap">
-              {existingImages.map((img, idx) => (
-                <div key={`existing-${idx}`} className="relative">
+              {allImages.map((img, idx) => (
+                <div key={`all-${img.id || idx}`} className="relative">
                   <img 
-                    src={img} 
-                    alt={`Existing ${idx + 1}`} 
+                    src={img.isNew ? img.url : `${img.url}?t=${Date.now()}`} 
+                    alt={`Image ${idx + 1}`} 
                     className="w-20 h-20 object-cover rounded border" 
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setExistingImages(prev => prev.filter((_, i) => i !== idx));
-                      // Also remove from formData.imageGallery
-                      setFormData(prev => ({
-                        ...prev,
-                        imageGallery: prev.imageGallery.filter((_, i) => i !== idx)
-                      }));
+                    onError={(e) => {
+                      console.warn('Image load failed:', img.url);
+                      (e.target as HTMLImageElement).src = '/placeholder-image.png'; // Fallback if available
                     }}
-                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600"
-                    title="Remove image"
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-        
-        {/* New Image Previews */}
-        {imagePreviews.length > 0 && (
-          <div>
-            <p className="text-sm text-gray-600 mb-2">New Images:</p>
-            <div className="flex gap-2 flex-wrap">
-              {imagePreviews.map((img, idx) => (
-                <div key={`new-${idx}`} className="relative">
-                  <img 
-                    src={img} 
-                    alt={`Preview ${idx + 1}`} 
-                    className="w-20 h-20 object-cover rounded border" 
                   />
                   <button
                     type="button"
-                    onClick={() => handleRemoveImage(idx)}
+                    onClick={() => handleRemoveImage(img.id || '')}
                     className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600"
                     title="Remove image"
                   >
                     ×
                   </button>
+                  {img.isNew && (
+                    <div className="absolute -bottom-1 -left-1 bg-green-500 text-white text-xs px-1 rounded">
+                      NEW
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -854,3 +832,4 @@ export default function ProductFormV2({ initialData, mode, loading, onSubmit, ca
     </form>
   );
 } 
+

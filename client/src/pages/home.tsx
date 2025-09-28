@@ -164,7 +164,7 @@ export default function Home() {
       <section className="relative text-white py-20 overflow-hidden" style={{ background: 'transparent', minHeight: '60vh' }}>
         {/* Visible dark blurred effect over video, behind text */}
         <div className="absolute inset-0 z-10" style={{ background: 'rgba(10,10,10,0.5)', filter: 'blur(12px)' }} />
-        {/* Background Video */}
+        {/* Background Video - Optimized for Fast Loading */}
         <video
           autoPlay
           loop
@@ -178,8 +178,16 @@ export default function Home() {
             zIndex: 0
           }}
           key={`hero-video-${Date.now()}`}
-          onLoadStart={() => {}}
-          onLoadedData={() => {}}
+          onLoadStart={() => {
+            // Show loading indicator
+            const fallback = document.getElementById('hero-fallback');
+            if (fallback) fallback.style.display = 'block';
+          }}
+          onLoadedData={() => {
+            // Hide loading indicator when video is ready
+            const fallback = document.getElementById('hero-fallback');
+            if (fallback) fallback.style.display = 'none';
+          }}
           onError={(e) => {
             // Hide video and show fallback background
             const video = e.target as HTMLVideoElement;
@@ -196,9 +204,13 @@ export default function Home() {
               if (fallback) fallback.style.display = 'block';
             });
           }}
-          preload="auto"
+          preload="metadata"
+          poster="/hero-video-poster.jpg"
+          data-lazy="true"
+          data-src={mediaSettings?.heroVideo || "/hero-video-new.mp4"}
         >
           <source src={mediaSettings?.heroVideo || "/hero-video-new.mp4"} type="video/mp4" />
+          <source src={mediaSettings?.heroVideo || "/hero-video-new.webm"} type="video/webm" />
         </video>
         
         {/* Fallback background image when video fails */}
@@ -273,7 +285,7 @@ export default function Home() {
                 className="rounded-xl shadow-lg w-full max-w-md h-auto mx-auto"
                 onError={(e) => {
                   const target = e.target as HTMLImageElement;
-                  target.src = "/default-placeholder.jpg";
+                  target.src = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDIwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik03NSA3NUgxMjVWMTI1SDc1Vjc1WiIgZmlsbD0iI0QxRDVEQiIvPgo8cGF0aCBkPSJNODUgODVIMTE1VjExNUg4NVY4NVoiIGZpbGw9IiM5Q0EzQUYiLz4KPHBhdGggZD0iTTgwIDkwSDEyMFYxMTBIMDgwVjkwWiIgZmlsbD0iIzlDQTNBRiIvPgo8dGV4dCB4PSIxMDAiIHk9IjE1MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iIzZCNzI4MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0Ij5ObyBJbWFnZTwvdGV4dD4KPC9zdmc+Cg==";
                 }}
               />
             </motion.div>
@@ -291,21 +303,21 @@ export default function Home() {
               </p>
               <p className="text-gray-600 text-base leading-relaxed">
                 Our systems power critical applications across a wide range of industries including{' '}
-                <span className="font-semibold text-blue-600">automotive</span>,{' '}
-                <span className="font-semibold text-blue-600">aerospace</span>,{' '}
-                <span className="font-semibold text-blue-600">pharmaceuticals</span>,{' '}
-                <span className="font-semibold text-blue-600">manufacturing</span>,{' '}
-                <span className="font-semibold text-blue-600">plastics</span>,{' '}
-                <span className="font-semibold text-blue-600">rubber</span>,{' '}
-                <span className="font-semibold text-blue-600">springs</span>,{' '}
-                <span className="font-semibold text-blue-600">electronics</span>,{' '}
-                <span className="font-semibold text-blue-600">textiles</span>,{' '}
-                <span className="font-semibold text-blue-600">food &amp; beverage</span>,{' '}
-                <span className="font-semibold text-blue-600">oil &amp; gas</span>,{' '}
-                <span className="font-semibold text-blue-600">power generation</span>,{' '}
-                <span className="font-semibold text-blue-600">defense</span>,{' '}
-                <span className="font-semibold text-blue-600">medical devices</span>, and{' '}
-                <span className="font-semibold text-blue-600">research institutions</span>. With modern facilities and an expert team, we tailor solutions to industry standards while enabling customers to achieve precision and productivity at scale.
+                <span className="font-semibold text-blue-600">Automotive</span>,{' '}
+                <span className="font-semibold text-blue-600">Aerospace</span>,{' '}
+                <span className="font-semibold text-blue-600">Pharmaceuticals</span>,{' '}
+                <span className="font-semibold text-blue-600">Manufacturing</span>,{' '}
+                <span className="font-semibold text-blue-600">Plastics</span>,{' '}
+                <span className="font-semibold text-blue-600">Rubber</span>,{' '}
+                <span className="font-semibold text-blue-600">Springs</span>,{' '}
+                <span className="font-semibold text-blue-600">Electronics</span>,{' '}
+                <span className="font-semibold text-blue-600">Textiles</span>,{' '}
+                <span className="font-semibold text-blue-600">Food &amp; Beverage</span>,{' '}
+                <span className="font-semibold text-blue-600">Oil &amp; Gas</span>,{' '}
+                <span className="font-semibold text-blue-600">Power Generation</span>,{' '}
+                <span className="font-semibold text-blue-600">Defense</span>,{' '}
+                <span className="font-semibold text-blue-600">Medical Devices</span>, and{' '}
+                <span className="font-semibold text-blue-600">Research Institutions</span>. With modern facilities and an expert team, we tailor solutions to industry standards while enabling customers to achieve precision and productivity at scale.
               </p>
             </motion.div>
           </div>
@@ -632,7 +644,7 @@ export default function Home() {
               transition={{ duration: 0.6, delay: 0.3 }}
             >
               <AnimatedCounter
-                end={30}
+                end={100}
                 suffix="+"
                 className="text-4xl font-bold mb-2"
               />

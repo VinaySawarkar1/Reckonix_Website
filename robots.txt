@@ -1,0 +1,21 @@
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://reckonix.co.in/sitemap.xml
+
+# Disallow admin areas
+Disallow: /reckonix/team/admin/
+Disallow: /api/
+Disallow: /uploads/
+
+# Allow important pages
+Allow: /products/
+Allow: /industries/
+Allow: /about/
+Allow: /contact/
+Allow: /career/
+Allow: /gallery/
+
+
+

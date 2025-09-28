@@ -122,3 +122,6 @@ The navbar change from "Customer" to "Industries" is now complete! Users will se
 4. **Better Focus**: Page emphasizes industry expertise and service
 
 The change provides a more professional and intuitive user experience while maintaining all existing functionality. 🎉
+
+
+

@@ -202,3 +202,6 @@ pm2 start ecosystem.config.js --watch
 - Review and rotate security credentials
 - Backup data and configurations
 - Monitor AWS costs and usage
+
+
+

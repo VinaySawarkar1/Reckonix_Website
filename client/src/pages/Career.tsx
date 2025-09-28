@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Briefcase, Users, TrendingUp, Award, MapPin, Clock, Building, ArrowRight } from 'lucide-react';
 
 interface Job {
-  id: string;
+  _id: string;
+  id?: string;
   title: string;
   location: string;
   experience: string;
@@ -49,8 +50,17 @@ const Career: React.FC = () => {
 
   useEffect(() => {
     fetch('/api/jobs')
-      .then(res => res.json())
-      .then(setJobs);
+      .then(res => {
+        if (!res.ok) {
+          throw new Error('Failed to fetch jobs');
+        }
+        return res.json();
+      })
+      .then(setJobs)
+      .catch(error => {
+        console.error('Error fetching jobs:', error);
+        setJobs([]);
+      });
   }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -64,17 +74,42 @@ const Career: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedJob) return;
-    const data = new FormData();
-    data.append('name', form.name);
-    data.append('email', form.email);
-    data.append('phone', form.phone);
-    data.append('location', form.location);
-    data.append('experience', form.experience);
-    if (form.resume) data.append('resume', form.resume);
-    data.append('jobId', selectedJob.id);
-    const res = await fetch('/api/apply', { method: 'POST', body: data });
-    if (res.ok) setMessage('Application submitted successfully!');
-    else setMessage('Submission failed. Please try again.');
+    
+    try {
+      const data = new FormData();
+      data.append('name', form.name);
+      data.append('email', form.email);
+      data.append('phone', form.phone);
+      data.append('location', form.location);
+      data.append('experience', form.experience);
+      if (form.resume) data.append('resume', form.resume);
+      data.append('jobId', selectedJob._id || selectedJob.id);
+      
+      const res = await fetch('/api/apply', { method: 'POST', body: data });
+      
+      if (res.ok) {
+        // Close the form modal
+        setSelectedJob(null);
+        // Reset form
+        setForm({
+          name: '',
+          email: '',
+          phone: '',
+          location: '',
+          experience: '',
+          resume: null,
+        });
+        // Show success popup
+        setMessage('Application sent successfully we will get back to you soon');
+        // Clear message after 5 seconds
+        setTimeout(() => setMessage(''), 5000);
+      } else {
+        setMessage('Submission failed. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error submitting application:', error);
+      setMessage('Submission failed. Please try again.');
+    }
   };
 
   return (
@@ -348,17 +383,55 @@ const Career: React.FC = () => {
                   </button>
                 </div>
                 
-                {message && (
-                  <div className={`mt-4 p-4 rounded-lg ${
-                    message.includes('successfully') 
-                      ? 'bg-green-50 text-green-700 border border-green-200' 
-                      : 'bg-red-50 text-red-700 border border-red-200'
-                  }`}>
-                    {message}
-                  </div>
-                )}
               </form>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success/Error Popup */}
+      {message && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 text-center">
+            <div className={`w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center ${
+              message.includes('successfully') 
+                ? 'bg-green-100' 
+                : 'bg-red-100'
+            }`}>
+              {message.includes('successfully') ? (
+                <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              ) : (
+                <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              )}
+            </div>
+            <h3 className={`text-xl font-bold mb-2 ${
+              message.includes('successfully') 
+                ? 'text-green-800' 
+                : 'text-red-800'
+            }`}>
+              {message.includes('successfully') ? 'Success!' : 'Error'}
+            </h3>
+            <p className={`text-lg ${
+              message.includes('successfully') 
+                ? 'text-green-700' 
+                : 'text-red-700'
+            }`}>
+              {message}
+            </p>
+            <button
+              onClick={() => setMessage('')}
+              className={`mt-6 px-6 py-3 rounded-lg font-semibold transition-all ${
+                message.includes('successfully')
+                  ? 'bg-green-600 text-white hover:bg-green-700'
+                  : 'bg-red-600 text-white hover:bg-red-700'
+              }`}
+            >
+              OK
+            </button>
           </div>
         </div>
       )}

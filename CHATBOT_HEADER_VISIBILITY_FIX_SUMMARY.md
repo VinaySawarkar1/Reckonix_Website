@@ -152,3 +152,6 @@ The chatbot header visibility issue is now completely resolved! Users will exper
 5. **Responsive Design**: Works perfectly on all device sizes
 
 The chatbot now provides a consistent and reliable user experience! 🎉
+
+
+

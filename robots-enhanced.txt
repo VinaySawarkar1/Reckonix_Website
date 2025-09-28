@@ -1,0 +1,27 @@
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://reckonix.co.in/sitemap.xml
+Sitemap: https://reckonix.co.in/enhanced-sitemap.xml
+
+# Disallow admin areas
+Disallow: /reckonix/team/admin/
+Disallow: /api/
+Disallow: /uploads/
+
+# Allow important pages
+Allow: /products/
+Allow: /industries/
+Allow: /calibration-services/
+Allow: /locations/
+Allow: /about/
+Allow: /contact/
+Allow: /career/
+Allow: /gallery/
+
+# Crawl delay for better server performance
+Crawl-delay: 1
+
+
+

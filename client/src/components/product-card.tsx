@@ -31,8 +31,12 @@ export default function ProductCard({ product }: ProductCardProps) {
         return "bg-maroon-100 text-maroon-600";
       case "Metrology Systems":
         return "bg-blue-100 text-blue-600";
-      case "Measuring Instruments":
+      case "Measuring Systems":
         return "bg-green-100 text-green-600";
+      case "Testing Systems":
+        return "bg-purple-100 text-purple-600";
+      case "Software":
+        return "bg-orange-100 text-orange-600";
       default:
         return "bg-gray-100 text-gray-600";
     }
@@ -44,22 +48,29 @@ export default function ProductCard({ product }: ProductCardProps) {
       transition={{ duration: 0.2 }}
     >
       <Card className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-all h-full w-64 min-w-[220px] max-w-xs">
-        <Link href={`/products/${product.id}`}>
+        <Link href={`/products/${product.id || product._id}`}>
           <div className="relative">
             {/** Use first image from images array if available, else fallback */}
             <img
               src={
-                product.images && product.images.length > 0
+                product.images && product.images.length > 0 && product.images[0].url && product.images[0].url.startsWith('/uploads/')
                   ? product.images[0].url
-                  : (product.imageUrl || "/default-placeholder.jpg")
+                  : (product.imageUrl && product.imageUrl.startsWith('/uploads/') 
+                      ? product.imageUrl 
+                      : "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDIwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik03NSA3NUgxMjVWMTI1SDc1Vjc1WiIgZmlsbD0iI0QxRDVEQiIvPgo8cGF0aCBkPSJNODUgODVIMTE1VjExNUg4NVY4NVoiIGZpbGw9IiM5Q0EzQUYiLz4KPHBhdGggZD0iTTgwIDkwSDEyMFYxMTBIMDgwVjkwWiIgZmlsbD0iIzlDQTNBRiIvPgo8dGV4dCB4PSIxMDAiIHk9IjE1MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iIzZCNzI4MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0Ij5ObyBJbWFnZTwvdGV4dD4KPC9zdmc+Cg==")
               }
               alt={product.name}
               className="w-full h-48 object-contain bg-white"
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
-                target.src = "/default-placeholder.jpg";
+                target.src = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDIwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik03NSA3NUgxMjVWMTI1SDc1Vjc1WiIgZmlsbD0iI0QxRDVEQiIvPgo8cGF0aCBkPSJNODUgODVIMTE1VjExNUg4NVY4NVoiIGZpbGw9IiM5Q0EzQUYiLz4KPHBhdGggZD0iTTgwIDkwSDEyMFYxMTBIMDgwVjkwWiIgZmlsbD0iIzlDQTNBRiIvPgo8dGV4dCB4PSIxMDAiIHk9IjE1MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iIzZCNzI4MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0Ij5ObyBJbWFnZTwvdGV4dD4KPC9zdmc+Cg==";
               }}
             />
+            {product.images && product.images.length > 1 && product.images.filter(img => img.url && img.url.startsWith('/uploads/')).length > 1 && (
+              <div className="absolute top-2 right-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
+                +{product.images.filter(img => img.url && img.url.startsWith('/uploads/')).length - 1} more
+              </div>
+            )}
             <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
           </div>
         </Link>
@@ -74,7 +85,7 @@ export default function ProductCard({ product }: ProductCardProps) {
             </Badge>
           </div>
           
-          <Link href={`/products/${product.id}`} className="flex-1">
+          <Link href={`/products/${product.id || product._id}`} className="flex-1">
             <h4 className="font-semibold text-base text-gray-900 mb-1 hover:text-maroon-500 transition-colors line-clamp-2">
               {product.name}
             </h4>
@@ -85,7 +96,7 @@ export default function ProductCard({ product }: ProductCardProps) {
           
           <div className="flex justify-between items-center mt-auto pt-3 border-t">
             <Link 
-              href={`/products/${product.id}`}
+              href={`/products/${product.id || product._id}`}
               className="text-[#800000] hover:text-[#6b0000] font-medium text-xs transition-colors"
             >
               View Details

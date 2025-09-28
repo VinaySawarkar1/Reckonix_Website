@@ -26,3 +26,6 @@ echo "✅ Deployment completed successfully!"
 echo "🌐 Application is running on port 3000"
 echo "📊 Check status with: npm run pm2:status"
 echo "📝 View logs with: npm run pm2:logs"
+
+
+

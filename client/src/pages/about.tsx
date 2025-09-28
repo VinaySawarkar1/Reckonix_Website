@@ -223,7 +223,7 @@ export default function About() {
                       <img 
                         src={member.photoUrl} 
                         alt={member.name}
-                        className="w-24 h-24 rounded-full mx-auto mb-4 object-cover"
+                        className="w-48 h-48 rounded-full mx-auto mb-4 object-cover"
                         onError={(e) => {
                           const img = e.target as HTMLImageElement;
                           img.style.display = 'none';
@@ -234,8 +234,8 @@ export default function About() {
                       />
                     ) : null}
                     {/* Fallback div when image fails to load or doesn't exist */}
-                    <div className={`w-24 h-24 rounded-full mx-auto mb-4 bg-gray-200 flex items-center justify-center ${member.photoUrl ? 'hidden' : 'flex'}`}>
-                      <Users className="h-12 w-12 text-gray-400" />
+                    <div className={`w-48 h-48 rounded-full mx-auto mb-4 bg-gray-200 flex items-center justify-center ${member.photoUrl ? 'hidden' : 'flex'}`}>
+                      <Users className="h-24 w-24 text-gray-400" />
                     </div>
                   </div>
 

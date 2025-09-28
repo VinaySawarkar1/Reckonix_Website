@@ -1,7 +1,6 @@
 import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import CustomerLogo from "../components/customer-logo";
-import { Building, Factory, Phone, Mail, MapPin } from "lucide-react";
 
 export default function Industries() {
   const { data: customers = [] } = useQuery({
@@ -19,6 +18,7 @@ export default function Industries() {
   const customersTyped: any[] = customers as any[];
   const industriesTyped: any[] = industries as any[];
   const testimonialsTyped: any[] = testimonials as any[];
+
 
   // DEMO: Add realistic customer entries if none exist (for demo/testing)
   const demoCustomers = [
@@ -92,28 +92,95 @@ export default function Industries() {
 
   // Use actual industries from database if available, otherwise fall back to hardcoded icons
   const industryIcons: Record<string, string> = {
-    "Aerospace & Defense": "✈️",
-    "Automotive Manufacturing": "🚗", 
-    "Pharmaceutical & Biotech": "🧬",
-    "Oil & Gas": "⚡",
-    "Electronics & Semiconductors": "💻",
-    "Research Institutions": "🔬"
+    // Aerospace & Defense
+    "Aerospace & Defense": "https://cdn-icons-png.flaticon.com/512/3003/3003984.png",
+    "Defense": "https://cdn-icons-png.flaticon.com/512/3003/3003984.png",
+    
+    // Automotive
+    "Automotive Manufacturing": "https://cdn-icons-png.flaticon.com/512/3003/3003912.png",
+    "Automotive": "https://cdn-icons-png.flaticon.com/512/3003/3003912.png",
+    "Automobile": "https://cdn-icons-png.flaticon.com/512/3003/3003912.png",
+    
+    // Pharmaceutical & Medical
+    "Pharmaceutical & Biotech": "https://cdn-icons-png.flaticon.com/512/3003/3003773.png",
+    "Pharma & Biomedical": "https://cdn-icons-png.flaticon.com/512/3003/3003773.png",
+    "Medical Devices": "https://cdn-icons-png.flaticon.com/512/3003/3003773.png",
+    
+    // Oil & Gas
+    "Oil & Gas": "https://cdn-icons-png.flaticon.com/512/3003/3003820.png",
+    
+    // Electronics & Technology
+    "Electronics & Semiconductors": "https://cdn-icons-png.flaticon.com/512/3003/3003750.png",
+    "Electronics": "https://cdn-icons-png.flaticon.com/512/3003/3003750.png",
+    
+    // Research & Education
+    "Research Institutions": "https://cdn-icons-png.flaticon.com/512/3003/3003740.png",
+    "Research": "https://cdn-icons-png.flaticon.com/512/3003/3003740.png",
+    
+    // Manufacturing & Industrial - using more specific icons
+    "Manufacturing": "https://cdn-icons-png.flaticon.com/512/1998/1998669.png",
+    "Plastics": "https://cdn-icons-png.flaticon.com/512/1998/1998669.png",
+    "Rubber": "https://cdn-icons-png.flaticon.com/512/1998/1998669.png",
+    "Springs": "https://cdn-icons-png.flaticon.com/512/1998/1998669.png",
+    "Textiles": "https://cdn-icons-png.flaticon.com/512/1998/1998669.png",
+    "Food & Beverage": "https://cdn-icons-png.flaticon.com/512/1998/1998669.png",
+    "Power Generation": "https://cdn-icons-png.flaticon.com/512/1998/1998669.png"
+  };
+
+  // Helper function to get the best matching icon for an industry
+  const getIndustryIcon = (industryName: string): string => {
+    // First try exact match
+    if (industryIcons[industryName]) {
+      return industryIcons[industryName];
+    }
+    
+    // Try case-insensitive match
+    const lowerName = industryName.toLowerCase();
+    for (const [key, icon] of Object.entries(industryIcons)) {
+      if (key.toLowerCase() === lowerName) {
+        return icon;
+      }
+    }
+    
+    // Try partial match for common terms
+    if (lowerName.includes('aerospace') || lowerName.includes('defense')) {
+      return industryIcons["Aerospace & Defense"];
+    }
+    if (lowerName.includes('automotive') || lowerName.includes('automobile')) {
+      return industryIcons["Automotive"];
+    }
+    if (lowerName.includes('pharma') || lowerName.includes('medical') || lowerName.includes('biotech')) {
+      return industryIcons["Pharmaceutical & Biotech"];
+    }
+    if (lowerName.includes('oil') || lowerName.includes('gas')) {
+      return industryIcons["Oil & Gas"];
+    }
+    if (lowerName.includes('electronic') || lowerName.includes('semiconductor')) {
+      return industryIcons["Electronics"];
+    }
+    if (lowerName.includes('research') || lowerName.includes('institution')) {
+      return industryIcons["Research Institutions"];
+    }
+    
+    // Default fallback
+    return "https://cdn-icons-png.flaticon.com/512/1998/1998669.png";
   };
 
   // Create customer categories from actual industries in database
   const customerCategories = industriesTyped.length > 0 
     ? industriesTyped.map(industry => ({
         title: industry.name,
-        description: `Leading ${industry.name.toLowerCase()} companies trust our precision instruments`,
-        icon: industry.icon || industryIcons[industry.name] || "🏭",
+        description: industry.description || `Leading ${industry.name.toLowerCase()} companies trust our precision instruments`,
+        icon: industry.icon || getIndustryIcon(industry.name), // Use database icon first, fallback to mapping
         customers: customersByIndustry[industry.name] || []
       }))
     : Object.keys(customersByIndustry).map(industry => ({
         title: industry,
         description: `Leading ${industry.toLowerCase()} companies trust our precision instruments`,
-        icon: industryIcons[industry] || "🏭",
+        icon: getIndustryIcon(industry),
         customers: customersByIndustry[industry]
       }));
+
 
   
 
@@ -189,9 +256,34 @@ export default function Industries() {
                 whileInView={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: index * 0.1 }}
                 viewport={{ once: true }}
-                className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition-shadow duration-300 p-8"
+                className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition-shadow duration-300 overflow-hidden"
               >
-                <div className="text-4xl mb-4">{category.icon}</div>
+                {category.icon && (category.icon.startsWith('http') || category.icon.startsWith('/uploads/')) ? (
+                  <div className="relative w-full h-40">
+                    <img 
+                      src={category.icon} 
+                      alt={`${category.title} icon`}
+                      className="w-full h-full object-cover transition-opacity duration-300"
+                      onLoad={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.style.opacity = '1';
+                      }}
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                        const fallback = target.nextElementSibling as HTMLElement;
+                        if (fallback) fallback.classList.remove('hidden');
+                      }}
+                      style={{ opacity: 0 }}
+                    />
+                    <div className="text-8xl hidden absolute inset-0 flex items-center justify-center">🏭</div>
+                  </div>
+                ) : (
+                  <div className="w-full h-40 flex items-center justify-center bg-gray-100">
+                    <div className="text-8xl">{category.icon || '🏭'}</div>
+                  </div>
+                )}
+                <div className="p-8">
                 <h3 className="text-2xl font-bold text-gray-900 mb-3">
                   {category.title}
                 </h3>
@@ -220,6 +312,7 @@ export default function Industries() {
                     )}
                   </div>
                 )}
+                </div>
               </motion.div>
             ))}
           </div>
@@ -283,135 +376,6 @@ export default function Industries() {
         </section>
       )}
 
-      {/* Get in Touch Section */}
-      <section className="py-16 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <motion.div
-            className="text-center mb-12"
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-          >
-            <h2 className="font-cinzel text-3xl font-bold text-gray-900 mb-4">Get In Touch</h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Ready to discuss your calibration and testing needs? We're here to help you find the perfect solution for your industry.
-            </p>
-          </motion.div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-            {/* Contact Information */}
-            <motion.div
-              initial={{ opacity: 0, x: -50 }}
-              whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-              transition={{ duration: 0.6 }}
-            >
-              <h3 className="font-cinzel text-2xl font-bold text-gray-900 mb-8">Contact Information</h3>
-              
-              <div className="space-y-8">
-                {/* Corporate Office */}
-                <div className="flex items-start">
-                  <div className="w-12 h-12 bg-maroon-500 rounded-full flex items-center justify-center mr-6 flex-shrink-0">
-                    <Building className="h-6 w-6 text-white" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-lg text-gray-900 mb-2">Corporate Office</h4>
-                    <p className="text-gray-600 mb-2">
-                      Gera's Imperium Gateway, office A-205, opp. Bhosari Metro Station, Nashik Phata,<br />
-                      Pune, Maharashtra 411034
-                    </p>
-                    <p className="text-gray-600"><Phone className="inline h-4 w-4 mr-1" /> 9175240313, 8767431725</p>
-                    <p className="text-gray-600"><Mail className="inline h-4 w-4 mr-1" /> sales@reckonix.co.in, sales@reckonix.in</p>
-                    <p className="text-gray-600 mb-2"><strong>GST No.:</strong> 27ABGFR0875B1ZA</p>
-                    <a
-                      href="https://maps.app.goo.gl/3Qw2Qw2Qw2Qw2Qw2A"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-maroon-500 hover:underline text-sm flex items-center mt-2"
-                    >
-                      <MapPin className="h-4 w-4 mr-1" /> Get Directions
-                    </a>
-                  </div>
-                </div>
-
-                {/* Manufacturing Facility */}
-                <div className="flex items-start">
-                  <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center mr-6 flex-shrink-0">
-                    <Factory className="h-6 w-6 text-white" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-lg text-gray-900 mb-2">Manufacturing Facility</h4>
-                    <p className="text-gray-600 mb-2">
-                      Plot No. 1, Survey No. 1/1, Near Bhosari MIDC,<br />
-                      Pune, Maharashtra 411026
-                    </p>
-                    <p className="text-gray-600"><Phone className="inline h-4 w-4 mr-1" /> 9175240313</p>
-                    <p className="text-gray-600"><Mail className="inline h-4 w-4 mr-1" /> manufacturing@reckonix.co.in</p>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-
-            {/* Quick Contact Form */}
-            <motion.div
-              initial={{ opacity: 0, x: 50 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6 }}
-            >
-              <div className="bg-gray-50 rounded-xl p-8">
-                <h3 className="font-cinzel text-2xl font-bold text-gray-900 mb-6">Quick Contact</h3>
-                <form className="space-y-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Name *</label>
-                    <input
-                      type="text"
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-maroon-500 focus:border-transparent"
-                      placeholder="Your full name"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Email *</label>
-                    <input
-                      type="email"
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-maroon-500 focus:border-transparent"
-                      placeholder="your.email@company.com"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Industry</label>
-                    <select className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-maroon-500 focus:border-transparent">
-                      <option value="">Select your industry</option>
-                      <option value="aerospace">Aerospace & Defense</option>
-                      <option value="automotive">Automotive Manufacturing</option>
-                      <option value="pharmaceutical">Pharmaceutical & Biotech</option>
-                      <option value="oil-gas">Oil & Gas</option>
-                      <option value="electronics">Electronics & Semiconductors</option>
-                      <option value="research">Research Institutions</option>
-                      <option value="other">Other</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Message *</label>
-                    <textarea
-                      rows={4}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-maroon-500 focus:border-transparent"
-                      placeholder="Tell us about your calibration and testing requirements..."
-                    ></textarea>
-                  </div>
-                  <button
-                    type="submit"
-                    className="w-full bg-maroon-500 text-white py-3 px-6 rounded-lg font-semibold hover:bg-maroon-600 transition-colors duration-300"
-                  >
-                    Send Message
-                  </button>
-                </form>
-            </div>
-          </motion.div>
-          </div>
-        </div>
-      </section>
     </div>
   );
 }

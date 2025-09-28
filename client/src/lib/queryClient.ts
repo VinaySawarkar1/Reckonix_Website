@@ -3,6 +3,12 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
+    console.error(`API Error ${res.status}: ${text}`);
+    // Don't throw error for analytics endpoints to prevent frontend crashes
+    if (res.url.includes('/api/analytics/')) {
+      console.warn('Analytics endpoint failed, continuing without error');
+      return;
+    }
     throw new Error(`${res.status}: ${text}`);
   }
 }

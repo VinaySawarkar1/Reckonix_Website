@@ -8,6 +8,8 @@ import { Label } from '../../components/ui/label';
 import { toast } from '../../hooks/use-toast';
 import { Category, fetchCategories } from '../../lib/utils';
 import { Trash2, Edit, Plus } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useCategories } from '../../context/category-context';
 
 
 
@@ -204,35 +206,15 @@ function TreeEditor({ nodes, setNodes }: { nodes: any[]; setNodes: (nodes: any[]
 }
 
 export default function CategoryManagement() {
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { categories: contextCategories, loading, refreshCategories } = useCategories();
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [formData, setFormData] = useState({ name: '' });
   const [treeSubcategories, setTreeSubcategories] = useState<any[]>([]);
 
-  useEffect(() => {
-    loadCategories();
-  }, []);
-
-  const loadCategories = async () => {
-    try {
-      const data = await fetchCategories();
-      
-      if (!data || !Array.isArray(data)) {
-        toast({ title: "Error", description: "Invalid API response", variant: "destructive" });
-        return;
-      }
-      
-      // Transform API response to frontend format
-      const transformedData = transformApiResponse(data);
-      setCategories(transformedData);
-    } catch (error) {
-      toast({ title: "Error", description: "Failed to load categories", variant: "destructive" });
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Transform API response to frontend format
+  const categories = transformApiResponse(contextCategories);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -268,11 +250,18 @@ export default function CategoryManagement() {
           : "Category created successfully",
       });
 
+      // Invalidate categories cache to refresh all components using categories
+      console.log('Invalidating categories cache...');
+      queryClient.invalidateQueries({ queryKey: ['/api/categories'] });
+      console.log('Categories cache invalidated');
+
+      // Also refresh the context
+      refreshCategories();
+
       setIsDialogOpen(false);
       setEditingCategory(null);
       setFormData({ name: '' });
       setTreeSubcategories([]);
-      loadCategories();
     } catch (error) {
       toast({
         title: "Error",
@@ -301,7 +290,13 @@ export default function CategoryManagement() {
         description: "Category deleted successfully",
       });
 
-      loadCategories();
+      // Invalidate categories cache to refresh all components using categories
+      console.log('Invalidating categories cache...');
+      queryClient.invalidateQueries({ queryKey: ['/api/categories'] });
+      console.log('Categories cache invalidated');
+
+      // Also refresh the context
+      refreshCategories();
     } catch (error) {
       toast({
         title: "Error",

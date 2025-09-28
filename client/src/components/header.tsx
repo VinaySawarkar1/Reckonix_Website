@@ -110,30 +110,36 @@ export default function Header() {
                             className="py-2 w-64 pr-6 bg-white border border-gray-200 shadow-lg rounded-lg"
                             style={{ position: 'relative', zIndex: 10 }}
                           >
-                            <Link
-                              href="/products"
-                              className="block px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100 hover:text-primary transition-colors border-b border-gray-200"
-                              onClick={() => setProductsDropdownOpen(false)}
-                            >
-                              All Products
-                            </Link>
-                            {categories.map((category, idx) => (
+                            <div className="px-4 pb-1 text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-200">
+                              Main Categories
+                            </div>
+                            <div className="max-h-64 overflow-auto">
                               <Link
-                                key={category.id}
-                                href={`/products?category=${encodeURIComponent(category.name)}`}
-                                className={`w-full text-left px-4 py-2 text-sm font-medium transition-colors border-b border-gray-100 ${idx===activeCatIdx? 'bg-gray-100 text-primary' : 'text-gray-700 hover:bg-gray-50 hover:text-primary'}`}
-                                onMouseEnter={() => setActiveCatIdx(idx)}
-                                onFocus={() => setActiveCatIdx(idx)}
-                                onClick={() => {
-                                  setActiveCatIdx(idx);
-                                  setProductsDropdownOpen(false);
-                                }}
+                                href="/products"
+                                className="block px-6 py-1.5 text-sm text-gray-600 hover:bg-gray-100 hover:text-primary transition-colors rounded-md"
+                                onClick={() => setProductsDropdownOpen(false)}
                               >
-                                {category.name}
+                                All Products
                               </Link>
-                            ))}
+                              {categories.map((category, idx) => (
+                                <Link
+                                  key={category.id}
+                                  href={`/products?category=${encodeURIComponent(category.name)}`}
+                                  className={`block px-6 py-1.5 text-sm text-gray-600 hover:bg-gray-100 hover:text-primary transition-colors rounded-md ${idx===activeCatIdx? 'bg-gray-100 text-primary' : ''}`}
+                                  onMouseEnter={() => setActiveCatIdx(idx)}
+                                  onFocus={() => setActiveCatIdx(idx)}
+                                  onClick={() => {
+                                    setActiveCatIdx(idx);
+                                    setProductsDropdownOpen(false);
+                                  }}
+                                >
+                                  {category.name}
+                                </Link>
+                              ))}
+                            </div>
                           </div>
-                          {/* Right: Subcategories as a separate card, absolutely positioned to the right of the first card */}
+                          
+                          {/* Middle: Subcategories */}
                           <div
                             className="py-2 w-72 pl-6 bg-white border border-gray-200 shadow-lg rounded-lg"
                             style={{ minHeight: '100%', zIndex: 20, position: 'absolute', left: '272px', top: 0 }}
@@ -144,24 +150,39 @@ export default function Header() {
                               </div>
                             )}
                             <div className="max-h-64 overflow-auto">
-                              {(categories[activeCatIdx]?.subcategories || []).map((subcategory: any, index: number) => {
-                                const subName = typeof subcategory === 'string' ? subcategory : subcategory.name;
-                                return (
-                                  <Link
-                                    key={index}
-                                    href={`/products?category=${encodeURIComponent(categories[activeCatIdx].name)}&subcategory=${encodeURIComponent(subName)}`}
-                                    className="block px-6 py-1.5 text-sm text-gray-600 hover:bg-gray-100 hover:text-primary transition-colors rounded-md"
-                                    onClick={() => setProductsDropdownOpen(false)}
-                                  >
-                                    {subName}
-                                  </Link>
-                                );
-                              })}
+                              {(() => {
+                                const renderSubcategories = (subs: any[]) => {
+                                  return subs.map((sub: any, index: number) => {
+                                    const subName = typeof sub === 'string' ? sub : sub.name;
+                                    // Check for nested subcategories - they are in the 'children' property
+                                    const children = sub.children || [];
+                                    const hasChildren = children.length > 0;
+                                    
+                                    return (
+                                      <div 
+                                        key={index} 
+                                        className="relative group"
+                                      >
+                                        <Link
+                                          href={`/products?category=${encodeURIComponent(categories[activeCatIdx].name)}&subcategory=${encodeURIComponent(subName)}`}
+                                          className="block px-6 py-1.5 text-sm text-gray-600 hover:bg-gray-100 hover:text-primary transition-colors rounded-md"
+                                          onClick={() => setProductsDropdownOpen(false)}
+                                        >
+                                          <span>{subName}</span>
+                                        </Link>
+                                      </div>
+                                    );
+                                  });
+                                };
+                                
+                                return renderSubcategories(categories[activeCatIdx]?.subcategories || []);
+                              })()}
                               {(!categories[activeCatIdx] || (categories[activeCatIdx]?.subcategories || []).length===0) && (
                                 <div className="px-4 py-2 text-sm text-gray-500">No subcategories</div>
                               )}
                             </div>
                           </div>
+                          
                         </div>
                       </motion.div>
                     )}
@@ -263,19 +284,45 @@ export default function Header() {
                     </Link>
                     {category.subcategories && category.subcategories.length > 0 && (
                       <div className="pl-6">
-                        {category.subcategories.map((subcategory, index) => {
-                          const subcategoryName = typeof subcategory === 'string' ? subcategory : subcategory.name;
-                          return (
+                        {(() => {
+                          // Helper function to render nested subcategories for mobile with proper hierarchy
+                          const renderSubcategories = (subs: any[], level: number = 0): Array<{name: string, path: string, level: number}> => {
+                            let result: Array<{name: string, path: string, level: number}> = [];
+                            subs.forEach((sub: any) => {
+                              const subName = typeof sub === 'string' ? sub : sub.name;
+                              const currentPath = [...Array(level).fill(''), subName].filter(Boolean);
+                              const fullPath = currentPath.join(' > ');
+                              
+                              result.push({
+                                name: subName,
+                                path: fullPath,
+                                level: level
+                              });
+                              
+                              // Recursively add children (sub-sub categories)
+                              const children = sub.children || sub.subcategories || [];
+                              if (children.length > 0) {
+                                result = result.concat(renderSubcategories(children, level + 1));
+                              }
+                            });
+                            return result;
+                          };
+                          
+                          const hierarchicalSubs = renderSubcategories(category.subcategories);
+                          
+                          return hierarchicalSubs.map((subcategory, index) => (
                             <Link
                               key={index}
-                              href={`/products?category=${encodeURIComponent(category.name)}&subcategory=${encodeURIComponent(subcategoryName)}`}
-                              className="block px-3 py-1 text-sm text-gray-600 hover:bg-gray-100 hover:text-primary transition-colors"
+                              href={`/products?category=${encodeURIComponent(category.name)}&subcategory=${encodeURIComponent(subcategory.path)}`}
+                              className={`block px-3 py-1 text-sm text-gray-600 hover:bg-gray-100 hover:text-primary transition-colors ${
+                                subcategory.level > 0 ? 'ml-4 text-xs' : ''
+                              }`}
                               onClick={() => setMobileMenuOpen(false)}
                             >
-                              {subcategoryName}
+                              {subcategory.level > 0 ? '└ ' : ''}{subcategory.name}
                             </Link>
-                          );
-                        })}
+                          ));
+                        })()}
                       </div>
                     )}
                   </div>

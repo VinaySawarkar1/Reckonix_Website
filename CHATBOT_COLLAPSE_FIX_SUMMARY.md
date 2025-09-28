@@ -195,3 +195,6 @@ The chatbot collapse/expand functionality is now complete. Users can:
 5. Enjoy smooth transitions and visual feedback
 
 All functionality works seamlessly across desktop and mobile devices.
+
+
+

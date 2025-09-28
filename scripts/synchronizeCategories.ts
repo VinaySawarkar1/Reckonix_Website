@@ -4,46 +4,50 @@ const prisma = new PrismaClient();
 
 // Define the correct categories and subcategories as per admin panel
 const validCategories = {
-  "Calibration Systems": [
+  "Calibration": [
+    "Pressure Calibrator",
+    "Multifunction Calibrator",
+    "Decade Boxes",
+    "Process Calibrators",
+    "Impedance Standards",
     "Dimension Calibrators",
     "Electrical Calibrators", 
     "Thermal Calibrator",
-    "Pressure Calibrator",
     "Mass and Volume",
     "Flow Calibrator"
   ],
-  "Metrology Systems": [
-    "Universal Testing Machines",
-    "Compression Testing Machines",
-    "Tensile Testing Machines", 
-    "Hardness Testing Machines",
-    "Impact Testing Machines",
-    "Fatigue Testing Machines",
-    "Torsion Testing Machines",
-    "Spring Testing Machines",
-    "Bend Testing Machines",
-    "Shear Testing Machines",
-    "Peel Testing Machines",
-    "Custom Testing Solutions"
+  "Metrology": [
+    "Coordinate Measuring Machine",
+    "Vision Measuring Machine", 
+    "Tool Presetter",
+    "Optical Comparator",
+    "Video Measuring System",
+    "Height Gauge",
+    "Roundness Measuring Machine",
+    "Surface Roughness Tester",
+    "Hardness Tester",
+    "Profile Projector",
+    "Linear Scale & DRO",
+    "Granite Surface Plate",
+    "Calibration Instruments"
   ],
-  "Measuring Systems": [
-    "Coordinate Measuring Machines (CMM)",
-    "Optical Measuring Systems",
-    "Laser Measuring Systems",
+  "Measuring": [
+    "Dataloggers",
+    "Transmitters",
+    "IOT Gateway",
     "Digital Calipers",
     "Digital Micrometers",
-    "Height Gauges",
-    "Surface Roughness Testers",
-    "Profile Projectors",
-    "Toolmakers Microscopes",
-    "Gauge Blocks",
     "Dial Indicators",
     "Digital Indicators",
     "Angle Measuring Instruments",
-    "Thickness Gauges",
-    "Roundness Testers",
-    "Flatness Testers",
-    "Straightness Testers"
+    "Thickness Gauges"
+  ],
+  "Software": [
+    "Calibration Software",
+    "Data Analysis Software",
+    "Quality Management Software",
+    "Measurement Software",
+    "Reporting Software"
   ]
 };
 

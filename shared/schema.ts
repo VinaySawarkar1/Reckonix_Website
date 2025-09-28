@@ -22,6 +22,7 @@ export const productSchema = z.object({
   category: z.string(),
   subcategory: z.string(),
   shortDescription: z.string(),
+  description: z.string().optional(), // Add description field for backend compatibility
   fullTechnicalInfo: z.string(),
   specifications: z.array(z.object({
     key: z.string(),
@@ -53,6 +54,7 @@ export const insertProductSchema = z.object({
   category: z.string(),
   subcategory: z.string(),
   shortDescription: z.string().min(1).max(500),
+  description: z.string().min(1).max(500).optional(), // Add description field for backend compatibility
   fullTechnicalInfo: z.string().min(1),
   specifications: z.array(z.object({
     key: z.string(),

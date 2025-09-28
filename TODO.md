@@ -1,23 +1,10 @@
-# Migration from Prisma to MongoDB - Script Updates
-
-## Overview
-The main server code has been migrated to MongoDB, but several scripts in the `scripts/` directory are still using Prisma. This TODO tracks the migration of these scripts to use MongoDB for consistency.
+# Add modelNumber Field to ProductFormV2
 
 ## Tasks
-
-### Scripts to Update
-- [ ] `scripts/importMeatestProducts.ts` - Update to use MongoDB instead of Prisma
-- [ ] `scripts/updateProductCategories.ts` - Update to use MongoDB instead of Prisma
-- [ ] `scripts/importCustomers.ts` - Update to use MongoDB instead of Prisma
-- [ ] Check and update any other scripts that use Prisma
-
-### Verification Steps
-- [ ] Test updated scripts to ensure they work with MongoDB
-- [ ] Verify data consistency between old and new implementations
-- [ ] Remove Prisma dependencies from package.json if no longer needed
-- [ ] Update any documentation or README files
-
-## Progress
-- [x] Analyzed current codebase and identified scripts using Prisma
-- [x] Confirmed MongoDB connection setup in server/mongo.ts
-- [x] Created this TODO file to track progress
+- [x] Add modelNumber to ProductFormData interface
+- [x] Initialize modelNumber in formData state
+- [x] Update useEffect to set modelNumber from initialData
+- [x] Add setModelNumber setter function
+- [x] Add modelNumber to extracted variables
+- [x] Add Model Number input field in JSX
+- [x] Test the form functionality

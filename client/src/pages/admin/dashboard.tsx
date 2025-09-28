@@ -25,7 +25,8 @@ import {
   FolderOpen,
   GripVertical,
   UserPlus,
-  Star
+  Star,
+  Calendar
 } from "lucide-react";
 import { useAuth } from "../../context/auth-context";
 import { useToast } from "@/hooks/use-toast";
@@ -245,8 +246,8 @@ export default function AdminDashboard() {
 
   const [message, setMessage] = useState('');
 
-  const [jobs, setJobs] = useState([]);
-  const [applications, setApplications] = useState([]);
+  const [jobs, setJobs] = useState<any[]>([]);
+  const [applications, setApplications] = useState<any[]>([]);
 
   // Team management state
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
@@ -264,6 +265,8 @@ export default function AdminDashboard() {
   const [showAddIndustryDialog, setShowAddIndustryDialog] = useState(false);
   const [editingIndustry, setEditingIndustry] = useState(null);
   const [newIndustry, setNewIndustry] = useState({ name: '', description: '', icon: '', rank: 0 });
+  const [industryImageFile, setIndustryImageFile] = useState(null);
+  const [editingIndustryImageFile, setEditingIndustryImageFile] = useState(null);
 
   // 2. Add state for testimonials
   const [showAddTestimonialDialog, setShowAddTestimonialDialog] = useState(false);
@@ -280,28 +283,64 @@ export default function AdminDashboard() {
   // 2. Fetch industries
   useEffect(() => {
     fetch('/api/industries')
-      .then(res => res.json())
-      .then(setIndustries);
+      .then(res => {
+        if (!res.ok) {
+          throw new Error('Failed to fetch industries');
+        }
+        return res.json();
+      })
+      .then(setIndustries)
+      .catch(error => {
+        console.error('Error fetching industries:', error);
+        setIndustries([]);
+      });
   }, []);
 
 
   useEffect(() => {
     fetch('/api/jobs')
-      .then(res => res.json())
-      .then(setJobs);
+      .then(res => {
+        if (!res.ok) {
+          throw new Error('Failed to fetch jobs');
+        }
+        return res.json();
+      })
+      .then(setJobs)
+      .catch(error => {
+        console.error('Error fetching jobs:', error);
+        setJobs([]);
+      });
   }, []);
 
   useEffect(() => {
     fetch('/api/applications')
-      .then(res => res.json())
-      .then(setApplications);
+      .then(res => {
+        if (!res.ok) {
+          throw new Error('Failed to fetch applications');
+        }
+        return res.json();
+      })
+      .then(setApplications)
+      .catch(error => {
+        console.error('Error fetching applications:', error);
+        setApplications([]);
+      });
   }, []);
 
   // Fetch team members
   useEffect(() => {
     fetch('/api/team')
-      .then(res => res.json())
-      .then(setTeamMembers);
+      .then(res => {
+        if (!res.ok) {
+          throw new Error('Failed to fetch team members');
+        }
+        return res.json();
+      })
+      .then(setTeamMembers)
+      .catch(error => {
+        console.error('Error fetching team members:', error);
+        setTeamMembers([]);
+      });
   }, []);
 
   // Redirect if not authenticated
@@ -313,15 +352,48 @@ export default function AdminDashboard() {
 
   // Industry CRUD handlers
   const handleAddIndustry = async () => {
-    const res = await fetch('/api/industries', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newIndustry),
-    });
-    if (res.ok) {
-      setShowAddIndustryDialog(false);
-      setNewIndustry({ name: '', description: '', icon: '', rank: 0 });
-      setIndustries(await (await fetch('/api/industries')).json());
+    try {
+      let industryData = { ...newIndustry };
+      
+      // If there's an image file, upload it first
+      if (industryImageFile) {
+        const formData = new FormData();
+        formData.append('image', industryImageFile);
+        
+        const uploadRes = await fetch('/api/upload/industry', {
+          method: 'POST',
+          body: formData,
+        });
+        
+        if (uploadRes.ok) {
+          const uploadResult = await uploadRes.json();
+          industryData.icon = uploadResult.url; // Use uploaded image URL as icon
+        }
+      }
+      
+      const res = await fetch('/api/industries', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(industryData),
+      });
+      
+      if (res.ok) {
+        setShowAddIndustryDialog(false);
+        setNewIndustry({ name: '', description: '', icon: '', rank: 0 });
+        setIndustryImageFile(null);
+        setIndustries(await (await fetch('/api/industries')).json());
+        toast({
+          title: "Success",
+          description: "Industry added successfully",
+        });
+      }
+    } catch (error) {
+      console.error('Error adding industry:', error);
+      toast({
+        title: "Error",
+        description: "Failed to add industry",
+        variant: "destructive",
+      });
     }
   };
 
@@ -329,14 +401,48 @@ export default function AdminDashboard() {
 
   const handleUpdateIndustry = async () => {
     if (!editingIndustry) return;
-    const res = await fetch(`/api/industries/${editingIndustry.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(editingIndustry),
-    });
-    if (res.ok) {
-      setEditingIndustry(null);
-      setIndustries(await (await fetch('/api/industries')).json());
+    
+    try {
+      let industryData = { ...editingIndustry };
+      
+      // If there's a new image file, upload it first
+      if (editingIndustryImageFile) {
+        const formData = new FormData();
+        formData.append('image', editingIndustryImageFile);
+        
+        const uploadRes = await fetch('/api/upload/industry', {
+          method: 'POST',
+          body: formData,
+        });
+        
+        if (uploadRes.ok) {
+          const uploadResult = await uploadRes.json();
+          industryData.icon = uploadResult.url; // Use uploaded image URL as icon
+        }
+      }
+      
+      const res = await fetch(`/api/industries/${editingIndustry.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(industryData),
+      });
+      
+      if (res.ok) {
+        setEditingIndustry(null);
+        setEditingIndustryImageFile(null);
+        setIndustries(await (await fetch('/api/industries')).json());
+        toast({
+          title: "Success",
+          description: "Industry updated successfully",
+        });
+      }
+    } catch (error) {
+      console.error('Error updating industry:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update industry",
+        variant: "destructive",
+      });
     }
   };
 
@@ -477,8 +583,10 @@ export default function AdminDashboard() {
     queryKey: ["/api/analytics/product-views"],
   });
 
-  const { data: events = [] } = useQuery({
+  const { data: events = [], isLoading: eventsLoading, error: eventsError } = useQuery({
     queryKey: ["/api/events"],
+    retry: 1,
+    staleTime: 30000,
   });
 
   const { data: catalog } = useQuery({
@@ -1010,7 +1118,7 @@ export default function AdminDashboard() {
       // Add all product data as form fields
       formData.append('name', editingProduct.name);
       formData.append('category', editingProduct.category);
-      formData.append('shortDescription', editingProduct.shortDescription);
+      formData.append('description', editingProduct.shortDescription); // Map shortDescription to description
       formData.append('fullTechnicalInfo', editingProduct.fullTechnicalInfo);
       formData.append('catalogPdfUrl', editingProduct.catalogPdfUrl || "");
       formData.append('datasheetPdfUrl', editingProduct.datasheetPdfUrl || "");
@@ -1073,20 +1181,23 @@ export default function AdminDashboard() {
 
   // Event mutations
   const createEvent = useMutation({
-    mutationFn: (eventData: any) => apiRequest("POST", "/api/events", eventData),
+    mutationFn: (eventData: any) => apiRequestWithFiles("POST", "/api/events", eventData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/events"] });
       setShowAddEventDialog(false);
       resetEventForm();
+      setEventFiles([]);
+      setEventPreviews([]);
       toast({
         title: "Event Created",
         description: "Event has been created successfully.",
       });
     },
-    onError: () => {
+    onError: (error: any) => {
+      console.error("Event creation error:", error);
       toast({
         title: "Error",
-        description: "Failed to create event.",
+        description: `Failed to create event: ${error.message || 'Unknown error'}`,
         variant: "destructive",
       });
     }
@@ -1094,19 +1205,22 @@ export default function AdminDashboard() {
 
   const updateEvent = useMutation({
     mutationFn: ({ id, data }: { id: number; data: any }) =>
-      apiRequest("PUT", `/api/events/${id}`, data),
+      apiRequestWithFiles("PUT", `/api/events/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/events"] });
       setEditingEvent(null);
+      setEditingEventFiles([]);
+      setEditingEventPreviews([]);
       toast({
         title: "Event Updated",
         description: "Event has been updated successfully.",
       });
     },
-    onError: () => {
+    onError: (error: any) => {
+      console.error("Event update error:", error);
       toast({
         title: "Error",
-        description: "Failed to update event.",
+        description: `Failed to update event: ${error.message || 'Unknown error'}`,
         variant: "destructive",
       });
     }
@@ -1121,10 +1235,11 @@ export default function AdminDashboard() {
         description: "Event has been deleted successfully.",
       });
     },
-    onError: () => {
+    onError: (error: any) => {
+      console.error("Event deletion error:", error);
       toast({
         title: "Error",
-        description: "Failed to delete event.",
+        description: `Failed to delete event: ${error.message || 'Unknown error'}`,
         variant: "destructive",
       });
     }
@@ -1168,6 +1283,34 @@ export default function AdminDashboard() {
   };
 
   const handleAddEvent = () => {
+    // Validate required fields
+    if (!newEvent.title.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Event title is required",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (!newEvent.description.trim()) {
+      toast({
+        title: "Validation Error", 
+        description: "Event description is required",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (!newEvent.eventDate) {
+      toast({
+        title: "Validation Error",
+        description: "Event date is required", 
+        variant: "destructive",
+      });
+      return;
+    }
+
     const formData = new FormData();
     Object.entries(newEvent).forEach(([key, value]) => {
       if (key === "imageFiles") return; // skip if any
@@ -1189,22 +1332,61 @@ export default function AdminDashboard() {
   };
 
   const handleUpdateEvent = () => {
-    if (editingEvent) {
-      const formData = new FormData();
-      Object.entries(editingEvent).forEach(([key, value]) => {
-        if (key === "imageFiles") return; // skip if any
-        if (value !== undefined && value !== null) {
-          formData.append(key, String(value));
-        }
+    if (!editingEvent) return;
+    
+    // Validate required fields
+    if (!editingEvent.title?.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Event title is required",
+        variant: "destructive",
       });
-      editingEventFiles.forEach(file => formData.append("images", file));
-      updateEvent.mutate({ id: editingEvent.id, data: formData });
+      return;
     }
+    
+    if (!editingEvent.description?.trim()) {
+      toast({
+        title: "Validation Error", 
+        description: "Event description is required",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (!editingEvent.eventDate) {
+      toast({
+        title: "Validation Error",
+        description: "Event date is required", 
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const formData = new FormData();
+    Object.entries(editingEvent).forEach(([key, value]) => {
+      // Skip immutable fields and imageFiles
+      if (key === "imageFiles" || key === "_id" || key === "id") return;
+      if (value !== undefined && value !== null) {
+        formData.append(key, String(value));
+      }
+    });
+    editingEventFiles.forEach(file => formData.append("images", file));
+    updateEvent.mutate({ id: editingEvent.id, data: formData });
   };
 
-  const handleDeleteEvent = (id: number) => {
+  const handleDeleteEvent = (event: any) => {
+    const eventId = event.id || event._id;
+    if (!eventId) {
+      toast({
+        title: "Error",
+        description: "Cannot delete event: Invalid event ID",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     if (confirm("Are you sure you want to delete this event?")) {
-      deleteEvent.mutate(id);
+      deleteEvent.mutate(eventId);
     }
   };
 
@@ -1330,23 +1512,37 @@ export default function AdminDashboard() {
 
   // Add this handler in AdminDashboard
   async function handleAddProductV2(data: any) {
-    const formData = new FormData();
-    Object.entries(data).forEach(([key, value]) => {
-      if (key === "images" && Array.isArray(value)) {
-        value.forEach((file: File) => formData.append("images", file));
-      } else if (
-        key === "specifications" ||
-        key === "featuresBenefits" ||
-        key === "applications" ||
-        key === "certifications" ||
-        key === "technicalDetails"
-      ) {
-        formData.append(key, JSON.stringify(value));
-      } else if (value !== undefined && value !== null) {
-        formData.append(key, value);
-      }
-    });
-    await apiRequestWithFiles("POST", "/api/products", formData);
+    let formToSend: FormData;
+
+    // If the incoming data is already a FormData (from ProductFormV2), use it directly
+    if (typeof FormData !== 'undefined' && data instanceof FormData) {
+      formToSend = data as FormData;
+    } else {
+      // Otherwise, build a new FormData from the plain object
+      const formData = new FormData();
+      Object.entries(data).forEach(([key, value]) => {
+        if (key === "images" && Array.isArray(value)) {
+          value.forEach((file: File) => formData.append("images", file));
+        } else if (
+          key === "specifications" ||
+          key === "featuresBenefits" ||
+          key === "applications" ||
+          key === "certifications" ||
+          key === "technicalDetails" ||
+          key === "imageGallery"
+        ) {
+          formData.append(key, JSON.stringify(value));
+        } else if (key === "shortDescription") {
+          // Backend accepts either description or shortDescription. Prefer mapping to description for consistency.
+          formData.append("description", String(value ?? ""));
+        } else if (value !== undefined && value !== null) {
+          formData.append(key, String(value));
+        }
+      });
+      formToSend = formData;
+    }
+
+    await apiRequestWithFiles("POST", "/api/products", formToSend);
     setShowAddProductDialog(false);
     queryClient.invalidateQueries({ queryKey: ["/api/products"] });
   }
@@ -1387,11 +1583,16 @@ export default function AdminDashboard() {
         if (data instanceof FormData) {
           // Data is already FormData, use it directly
           // FormData contents processed
+          console.log('DASHBOARD - Sending FormData with new images');
+          console.log('DASHBOARD - FormData entries:');
+          for (let [key, value] of data.entries()) {
+            console.log(`${key}:`, value);
+          }
           
-          response = await fetch(`/api/products/${editingProduct.id}`, {
-            method: "PUT",
-            body: data,
-          });
+        response = await fetch(`/api/products/${editingProduct._id || editingProduct.id}`, {
+          method: "PUT",
+          body: data,
+        });
         } else {
                     // Convert to FormData
         const formData = new FormData();
@@ -1401,6 +1602,9 @@ export default function AdminDashboard() {
             value.forEach((file: File) => formData.append("images", file));
           } else if (key === "existingImages" && Array.isArray(value)) {
             formData.append(key, JSON.stringify(value));
+          } else if (key === "shortDescription") {
+            // Map shortDescription to description for backend compatibility
+            formData.append("description", value);
           } else if (
             key === "specifications" ||
             key === "featuresBenefits" ||
@@ -1417,47 +1621,68 @@ export default function AdminDashboard() {
           
           // Converted FormData contents processed
           
-        response = await fetch(`/api/products/${editingProduct.id}`, {
+        response = await fetch(`/api/products/${editingProduct._id || editingProduct.id}`, {
           method: "PUT",
           body: formData,
         });
         }
       } else {
-        // Using JSON for text-only update
-        // Send as JSON
-        const dataToSend = {
-          ...data,
-          specifications: JSON.stringify(data.specifications),
-          featuresBenefits: JSON.stringify(data.featuresBenefits),
-          applications: JSON.stringify(data.applications),
-          certifications: JSON.stringify(data.certifications),
-          technicalDetails: JSON.stringify(data.technicalDetails),
-          existingImages: data.existingImages ? JSON.stringify(data.existingImages) : undefined,
-          imageGallery: data.imageGallery ? JSON.stringify(data.imageGallery) : undefined,
-        };
-        response = await fetch(`/api/products/${editingProduct.id}`, {
+        // Using FormData for all updates (including text-only)
+        // Convert data to FormData if it's not already
+        let formDataToSend;
+        if (data instanceof FormData) {
+          formDataToSend = data;
+        } else {
+          formDataToSend = new FormData();
+          Object.entries(data).forEach(([key, value]) => {
+            if (key === "images" && Array.isArray(value)) {
+              value.forEach((file: File) => formDataToSend.append("images", file));
+            } else if (key === "existingImages" && Array.isArray(value)) {
+              formDataToSend.append(key, JSON.stringify(value));
+            } else if (key === "shortDescription") {
+              // Map shortDescription to description for backend compatibility
+              formDataToSend.append("description", value);
+            } else if (
+              key === "specifications" ||
+              key === "featuresBenefits" ||
+              key === "applications" ||
+              key === "certifications" ||
+              key === "technicalDetails" ||
+              key === "imageGallery"
+            ) {
+              formDataToSend.append(key, JSON.stringify(value));
+            } else if (value !== undefined && value !== null && value !== '') {
+              formDataToSend.append(key, value);
+            }
+          });
+        }
+        
+        response = await fetch(`/api/products/${editingProduct._id || editingProduct.id}`, {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(dataToSend),
-      });
+          body: formDataToSend,
+        });
       }
       
       if (response.ok) {
         const updatedProduct = await response.json();
-        setEditingProduct(null);
+        // Don't update editingProduct state to prevent form re-initialization
+        // Just invalidate queries to refresh the product list
         queryClient.invalidateQueries({ queryKey: ["/api/products"] });
         toast({
           title: "Success",
           description: "Product updated successfully",
         });
       } else {
-        throw new Error("Failed to update product");
+        const errorText = await response.text();
+        console.error('Product update error:', response.status, errorText);
+        throw new Error(`Failed to update product: ${response.status} - ${errorText}`);
       }
     } catch (error) {
       // Error updating product
+      console.error('Product update error:', error);
       toast({
         title: "Error",
-        description: "Failed to update product",
+        description: `Failed to update product: ${error.message}`,
         variant: "destructive",
       });
     }
@@ -1552,7 +1777,16 @@ export default function AdminDashboard() {
       setMessage('Job updated!');
       setEditingJob(null);
       setForm({ title: '', location: '', requirements: '', description: '', type: jobTypeOptions[0], experience: '', salary: '' });
-      fetch('/api/jobs').then(res => res.json()).then(setJobs);
+      fetch('/api/jobs')
+        .then(res => {
+          if (!res.ok) throw new Error('Failed to fetch jobs');
+          return res.json();
+        })
+        .then(setJobs)
+        .catch(error => {
+          console.error('Error fetching jobs:', error);
+          setJobs([]);
+        });
     } else {
       setMessage('Failed to update job.');
     }
@@ -1563,7 +1797,16 @@ export default function AdminDashboard() {
     const res = await fetch(`/api/jobs/${id}`, { method: 'DELETE' });
     if (res.ok) {
       setMessage('Job deleted!');
-      fetch('/api/jobs').then(res => res.json()).then(setJobs);
+      fetch('/api/jobs')
+        .then(res => {
+          if (!res.ok) throw new Error('Failed to fetch jobs');
+          return res.json();
+        })
+        .then(setJobs)
+        .catch(error => {
+          console.error('Error fetching jobs:', error);
+          setJobs([]);
+        });
     } else {
       setMessage('Failed to delete job.');
     }
@@ -1579,7 +1822,16 @@ export default function AdminDashboard() {
     if (res.ok) {
       setMessage('Job added!');
       setForm({ title: '', location: '', requirements: '', description: '', type: jobTypeOptions[0], experience: '', salary: '' });
-      fetch('/api/jobs').then(res => res.json()).then(setJobs);
+      fetch('/api/jobs')
+        .then(res => {
+          if (!res.ok) throw new Error('Failed to fetch jobs');
+          return res.json();
+        })
+        .then(setJobs)
+        .catch(error => {
+          console.error('Error fetching jobs:', error);
+          setJobs([]);
+        });
     } else {
       setMessage('Failed to add job.');
     }
@@ -1607,6 +1859,19 @@ export default function AdminDashboard() {
   const newQuotes = quotes.filter(q => q.status === "New").length;
   const newMessages = messages.filter(m => !m.replied).length;
 
+  // Create subcategories mapping from categories data
+  const subcategories = React.useMemo(() => {
+    const subcatMap: { [key: string]: string[] } = {};
+    categories.forEach(category => {
+      if (category.subcategories) {
+        subcatMap[category.name] = category.subcategories.map(sub => 
+          typeof sub === 'string' ? sub : sub.name
+        );
+      }
+    });
+    return subcatMap;
+  }, [categories]);
+
   const ProductForm = React.memo(({ product, isEditing = false }: { product: any; isEditing?: boolean }) => (
     <div className="space-y-6 max-h-96 overflow-y-auto">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1628,10 +1893,11 @@ export default function AdminDashboard() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="Calibration Systems">Calibration Systems</SelectItem>
-              <SelectItem value="Metrology Systems">Metrology Systems</SelectItem>
-              <SelectItem value="Measuring Instruments">Measuring Instruments</SelectItem>
-              <SelectItem value="Metrology">Metrology</SelectItem>
+              {categories.filter(category => category.name && category.name.trim()).map((category) => (
+                <SelectItem key={category.id} value={category.name}>
+                  {category.name}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -1646,7 +1912,7 @@ export default function AdminDashboard() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {(subcategories[product.category] || []).map((subcat) => (
+              {(subcategories[product.category] || []).filter(subcat => subcat && subcat.trim()).map((subcat) => (
                 <SelectItem key={subcat} value={subcat}>{subcat}</SelectItem>
               ))}
             </SelectContent>
@@ -1677,7 +1943,7 @@ export default function AdminDashboard() {
       <div>
         <label className="block text-sm font-medium mb-2">Technical Specifications</label>
         {product.specifications.map((spec: any, index: number) => (
-          <div key={index} className="flex gap-2 mb-2">
+          <div key={`spec-${index}`} className="flex gap-2 mb-2">
             <Input
               placeholder="Parameter"
               value={spec.key}
@@ -1727,7 +1993,7 @@ export default function AdminDashboard() {
       <div>
         <label className="block text-sm font-medium mb-2">Features & Benefits</label>
         {product.featuresBenefits.map((feature: string, index: number) => (
-          <div key={index} className="flex gap-2 mb-2">
+          <div key={`feature-${index}`} className="flex gap-2 mb-2">
             <Input
               placeholder="Feature or benefit"
               value={feature}
@@ -1764,7 +2030,7 @@ export default function AdminDashboard() {
       <div>
         <label className="block text-sm font-medium mb-2">Applications</label>
         {product.applications.map((app: string, index: number) => (
-          <div key={index} className="flex gap-2 mb-2">
+          <div key={`app-${index}`} className="flex gap-2 mb-2">
             <Input
               placeholder="Application area"
               value={app}
@@ -1801,7 +2067,7 @@ export default function AdminDashboard() {
       <div>
         <label className="block text-sm font-medium mb-2">Certifications</label>
         {product.certifications.map((cert: string, index: number) => (
-          <div key={index} className="flex gap-2 mb-2">
+          <div key={`cert-${index}`} className="flex gap-2 mb-2">
             <Input
               placeholder="Certification"
               value={cert}
@@ -1998,7 +2264,7 @@ export default function AdminDashboard() {
         />
         <div className="flex gap-2 mt-2 flex-wrap">
           {product.imageGallery && product.imageGallery.map((img: string, idx: number) => (
-            <div key={idx} className="relative">
+            <div key={`gallery-${idx}`} className="relative">
               <img src={img} alt="Preview" className="w-20 h-20 object-cover rounded border" />
               <button
                 type="button"
@@ -2063,23 +2329,36 @@ export default function AdminDashboard() {
         <div className="flex min-h-screen">
           {/* Sidebar */}
           <aside className="w-56 bg-green-100 p-4 flex flex-col gap-2 border-r border-green-200">
-            <button onClick={() => setActiveTab('dashboard')} className={`flex items-center gap-2 px-4 py-2 rounded transition-all ${activeTab === 'dashboard' ? 'bg-maroon-500 text-white' : 'hover:bg-green-200 text-green-900'}`}><BarChart3 className="inline" /> Dashboard</button>
-            <button onClick={() => setActiveTab('products')} className={`flex items-center gap-2 px-4 py-2 rounded transition-all ${activeTab === 'products' ? 'bg-maroon-500 text-white' : 'hover:bg-green-200 text-green-900'}`}><Package className="inline" /> Products</button>
-            <button onClick={() => setActiveTab('category-management')} className={`flex items-center gap-2 px-4 py-2 rounded transition-all ${activeTab === 'category-management' ? 'bg-maroon-500 text-white' : 'hover:bg-green-200 text-green-900'}`}><FolderOpen className="inline" /> Category Management</button>
-            <button onClick={() => setActiveTab('product-order')} className={`flex items-center gap-2 px-4 py-2 rounded transition-all ${activeTab === 'product-order' ? 'bg-maroon-500 text-white' : 'hover:bg-green-200 text-green-900'}`}><GripVertical className="inline" /> Product Order</button>
-            <button onClick={() => setActiveTab('events')} className={`flex items-center gap-2 px-4 py-2 rounded transition-all ${activeTab === 'events' ? 'bg-maroon-500 text-white' : 'hover:bg-green-200 text-green-900'}`}><Users className="inline" /> Events</button>
-            <button onClick={() => setActiveTab('customers')} className={`flex items-center gap-2 px-4 py-2 rounded transition-all ${activeTab === 'customers' ? 'bg-maroon-500 text-white' : 'hover:bg-green-200 text-green-900'}`}><Users className="inline" /> Customers</button>
-            <button onClick={() => setActiveTab('team')} className={`flex items-center gap-2 px-4 py-2 rounded transition-all ${activeTab === 'team' ? 'bg-maroon-500 text-white' : 'hover:bg-green-200 text-green-900'}`}><UserPlus className="inline" /> Team</button>
-            <button onClick={() => setActiveTab('quotes')} className={`flex items-center gap-2 px-4 py-2 rounded transition-all ${activeTab === 'quotes' ? 'bg-maroon-500 text-white' : 'hover:bg-green-200 text-green-900'}`}><FileText className="inline" /> Quotes</button>
-            <button onClick={() => setActiveTab('messages')} className={`flex items-center gap-2 px-4 py-2 rounded transition-all ${activeTab === 'messages' ? 'bg-maroon-500 text-white' : 'hover:bg-green-200 text-green-900'}`}><MessageSquare className="inline" /> Messages</button>
-            <button onClick={() => setActiveTab('catalog')} className={`flex items-center gap-2 px-4 py-2 rounded transition-all ${activeTab === 'catalog' ? 'bg-maroon-500 text-white' : 'hover:bg-green-200 text-green-900'}`}><Download className="inline" /> Catalog</button>
-            <button onClick={() => setActiveTab('analytics')} className={`flex items-center gap-2 px-4 py-2 rounded transition-all ${activeTab === 'analytics' ? 'bg-maroon-500 text-white' : 'hover:bg-green-200 text-green-900'}`}><Eye className="inline" /> Analytics</button>
-            <button onClick={() => setActiveTab('jobs')} className={`flex items-center gap-2 px-4 py-2 rounded transition-all ${activeTab === 'jobs' ? 'bg-maroon-500 text-white' : 'hover:bg-green-200 text-green-900'}`}><Plus className="inline" /> Jobs</button>
-            <button onClick={() => setActiveTab('chatbot-summaries')} className={`flex items-center gap-2 px-4 py-2 rounded transition-all ${activeTab === 'chatbot-summaries' ? 'bg-maroon-500 text-white' : 'hover:bg-green-200 text-green-900'}`}><MessageSquare className="inline" /> Chatbot Summaries</button>
-            <button onClick={() => setActiveTab('gallery')} className={`flex items-center gap-2 px-4 py-2 rounded transition-all ${activeTab === 'gallery' ? 'bg-maroon-500 text-white' : 'hover:bg-green-200 text-green-900'}`}><GripVertical className="inline" /> Gallery</button>
-            <button onClick={() => setActiveTab('industries')} className={`flex items-center gap-2 px-4 py-2 rounded transition-all ${activeTab === 'industries' ? 'bg-maroon-500 text-white' : 'hover:bg-green-200 text-green-900'}`}><FolderOpen className="inline" /> Industries</button>
-            <button onClick={() => setActiveTab('testimonials')} className={`flex items-center gap-2 px-4 py-2 rounded transition-all ${activeTab === 'testimonials' ? 'bg-maroon-500 text-white' : 'hover:bg-green-200 text-green-900'}`}><Star className="inline" /> Testimonials</button>
-            <button onClick={() => setActiveTab('media')} className={`flex items-center gap-2 px-4 py-2 rounded transition-all ${activeTab === 'media' ? 'bg-maroon-500 text-white' : 'hover:bg-green-200 text-green-900'}`}><Eye className="inline" /> Media</button>
+            {[
+              { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
+              { id: 'products', label: 'Products', icon: Package },
+              { id: 'category-management', label: 'Category Management', icon: FolderOpen },
+              { id: 'product-order', label: 'Product Order', icon: GripVertical },
+              { id: 'events', label: 'Events', icon: Users },
+              { id: 'customers', label: 'Customers', icon: Users },
+              { id: 'team', label: 'Team', icon: UserPlus },
+              { id: 'quotes', label: 'Quotes', icon: FileText },
+              { id: 'messages', label: 'Messages', icon: MessageSquare },
+              { id: 'catalog', label: 'Catalog', icon: Download },
+              { id: 'analytics', label: 'Analytics', icon: Eye },
+              { id: 'jobs', label: 'Jobs', icon: Plus },
+              { id: 'chatbot-summaries', label: 'Chatbot Summaries', icon: MessageSquare },
+              { id: 'gallery', label: 'Gallery', icon: GripVertical },
+              { id: 'industries', label: 'Industries', icon: FolderOpen },
+              { id: 'testimonials', label: 'Testimonials', icon: Star },
+              { id: 'media', label: 'Media', icon: Eye }
+            ].map((tab) => {
+              const IconComponent = tab.icon;
+              return (
+                <button 
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)} 
+                  className={`flex items-center gap-2 px-4 py-2 rounded transition-all ${activeTab === tab.id ? 'bg-maroon-500 text-white' : 'hover:bg-green-200 text-green-900'}`}
+                >
+                  <IconComponent className="inline" /> {tab.label}
+                </button>
+              );
+            })}
           </aside>
           {/* Main Content */}
           <main className="flex-1 p-8">
@@ -2200,10 +2479,11 @@ export default function AdminDashboard() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">All Categories</SelectItem>
-                          <SelectItem value="Calibration Systems">Calibration Systems</SelectItem>
-                          <SelectItem value="Metrology Systems">Metrology Systems</SelectItem>
-                          <SelectItem value="Measuring Instruments">Measuring Instruments</SelectItem>
-                          <SelectItem value="Metrology">Metrology</SelectItem>
+                          {categories.filter(category => category.name && category.name.trim()).map(category => (
+                            <SelectItem key={category.id} value={category.name}>
+                              {category.name}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -2213,7 +2493,7 @@ export default function AdminDashboard() {
                         <thead className="bg-gray-50">
                           <tr>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Product
+                              Product & Image
                             </th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                               Category
@@ -2232,15 +2512,28 @@ export default function AdminDashboard() {
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="flex items-center">
                                   <img
-                                    className="h-10 w-10 rounded-lg object-cover"
-                                    src={product.imageUrl}
+                                    className="h-12 w-12 rounded-lg object-cover border border-gray-200"
+                                    src={
+                                      product.images && product.images.length > 0
+                                        ? product.images[0].url
+                                        : (product.imageUrl || "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgiIGhlaWdodD0iNDgiIHZpZXdCb3g9IjAgMCA0OCA0OCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjQ4IiBoZWlnaHQ9IjQ4IiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0xOCAyMEgzMFYyOEgxOFYyMFoiIGZpbGw9IiNEMUQ1REIiLz4KPHBhdGggZD0iTTIwIDIySDI4VjI2SDIwVjIyWiIgZmlsbD0iIzlDQTNBRiIvPgo8cGF0aCBkPSJNMTkgMjFIMjlWMjVIMTlWMjFaIiBmaWxsPSIjOUNBM0FGIi8+Cjwvc3ZnPgo=")
+                                    }
                                     alt={product.name}
+                                    onError={(e) => {
+                                      const target = e.target as HTMLImageElement;
+                                      target.src = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgiIGhlaWdodD0iNDgiIHZpZXdCb3g9IjAgMCA0OCA0OCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjQ4IiBoZWlnaHQ9IjQ4IiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0xOCAyMEgzMFYyOEgxOFYyMFoiIGZpbGw9IiNEMUQ1REIiLz4KPHBhdGggZD0iTTIwIDIySDI4VjI2SDIwVjIyWiIgZmlsbD0iIzlDQTNBRiIvPgo8cGF0aCBkPSJNMTkgMjFIMjlWMjVIMTlWMjFaIiBmaWxsPSIjOUNBM0FGIi8+Cjwvc3ZnPgo=";
+                                    }}
                                   />
                                   <div className="ml-4">
                                     <div className="text-sm font-medium text-gray-900">{product.name}</div>
                                     <div className="text-sm text-gray-500 truncate max-w-xs">
                                       {product.shortDescription}
                                     </div>
+                                    {product.images && product.images.length > 1 && (
+                                      <div className="text-xs text-gray-400 mt-1">
+                                        +{product.images.length - 1} more image{product.images.length - 1 > 1 ? 's' : ''}
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                               </td>
@@ -2339,6 +2632,7 @@ export default function AdminDashboard() {
                     </div>
                     {editingProduct && (
                       <ProductFormV2
+                        key={editingProduct._id || editingProduct.id || 'edit-form'}
                         initialData={editingProduct}
                         mode="edit"
                         loading={false}
@@ -2398,7 +2692,37 @@ export default function AdminDashboard() {
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                          {events.map((event) => (
+                          {eventsLoading ? (
+                            <tr>
+                              <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
+                                <div className="flex flex-col items-center">
+                                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
+                                  <p className="text-lg font-medium">Loading events...</p>
+                                </div>
+                              </td>
+                            </tr>
+                          ) : eventsError ? (
+                            <tr>
+                              <td colSpan={4} className="px-6 py-8 text-center text-red-500">
+                                <div className="flex flex-col items-center">
+                                  <Calendar className="h-12 w-12 text-red-300 mb-4" />
+                                  <p className="text-lg font-medium">Error loading events</p>
+                                  <p className="text-sm">Please try refreshing the page</p>
+                                </div>
+                              </td>
+                            </tr>
+                          ) : !events || !Array.isArray(events) || events.length === 0 ? (
+                            <tr>
+                              <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
+                                <div className="flex flex-col items-center">
+                                  <Calendar className="h-12 w-12 text-gray-300 mb-4" />
+                                  <p className="text-lg font-medium">No events found</p>
+                                  <p className="text-sm">Click "Add Event" to create your first event</p>
+                                </div>
+                              </td>
+                            </tr>
+                          ) : (
+                            events.map((event) => (
                             <tr key={event.id}>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="flex items-center">
@@ -2445,14 +2769,15 @@ export default function AdminDashboard() {
                                     variant="ghost" 
                                     size="sm" 
                                     className="text-red-600 hover:text-red-900"
-                                    onClick={() => handleDeleteEvent(event.id)}
+                                    onClick={() => handleDeleteEvent(event)}
                                   >
                                     <Trash2 className="h-4 w-4" />
                                   </Button>
                                 </div>
                               </td>
                             </tr>
-                          ))}
+                            ))
+                          )}
                         </tbody>
                       </table>
                     </div>
@@ -3632,22 +3957,46 @@ export default function AdminDashboard() {
                     <tr>
                       <th className="p-2 border">Name</th>
                       <th className="p-2 border">Email</th>
+                      <th className="p-2 border">Phone</th>
                       <th className="p-2 border">Location</th>
                       <th className="p-2 border">Experience</th>
                       <th className="p-2 border">Job</th>
+                      <th className="p-2 border">Status</th>
                       <th className="p-2 border">Resume</th>
+                      <th className="p-2 border">Applied Date</th>
                     </tr>
                   </thead>
                   <tbody>
                     {applications.map((app) => (
-                      <tr key={app.id}>
+                      <tr key={app.id || app._id}>
                         <td className="p-2 border">{app.name}</td>
                         <td className="p-2 border">{app.email}</td>
+                        <td className="p-2 border">{app.phone || 'N/A'}</td>
                         <td className="p-2 border">{app.location}</td>
                         <td className="p-2 border">{app.experience}</td>
-                        <td className="p-2 border">{app.jobTitle}</td>
+                        <td className="p-2 border">{app.jobTitle || 'N/A'}</td>
                         <td className="p-2 border">
-                          <a href={app.resumeUrl} target="_blank" rel="noopener noreferrer" className="text-maroon-500 underline">Download</a>
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            app.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                            app.status === 'reviewed' ? 'bg-blue-100 text-blue-800' :
+                            app.status === 'accepted' ? 'bg-green-100 text-green-800' :
+                            app.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {app.status || 'pending'}
+                          </span>
+                        </td>
+                        <td className="p-2 border">
+                          {app.resumeUrl ? (
+                            <a href={app.resumeUrl} target="_blank" rel="noopener noreferrer" className="text-maroon-500 underline hover:text-maroon-700">
+                              Download
+                            </a>
+                          ) : (
+                            <span className="text-gray-400">No resume</span>
+                          )}
+                        </td>
+                        <td className="p-2 border">
+                          {app.createdAt ? new Date(app.createdAt).toLocaleDateString() : 'N/A'}
                         </td>
                       </tr>
                     ))}
@@ -3683,7 +4032,23 @@ export default function AdminDashboard() {
                       <tbody className="bg-white divide-y divide-gray-200">
                         {industries.map((industry) => (
                           <tr key={industry.id}>
-                            <td className="px-4 py-2 text-2xl">{industry.icon}</td>
+                            <td className="px-4 py-2">
+                              {industry.icon && industry.icon.startsWith('http') ? (
+                                <img 
+                                  src={industry.icon} 
+                                  alt={`${industry.name} icon`}
+                                  className="w-8 h-8 object-cover rounded"
+                                  onError={(e) => {
+                                    const target = e.target as HTMLImageElement;
+                                    target.style.display = 'none';
+                                    target.nextElementSibling?.classList.remove('hidden');
+                                  }}
+                                />
+                              ) : (
+                                <div className="text-2xl">{industry.icon || '🏭'}</div>
+                              )}
+                              <div className="text-2xl hidden">🏭</div>
+                            </td>
                             <td className="px-4 py-2 font-semibold">{industry.name}</td>
                             <td className="px-4 py-2">{industry.description}</td>
                             <td className="px-4 py-2">{industry.rank}</td>
@@ -3702,10 +4067,37 @@ export default function AdminDashboard() {
                   <div className="bg-white rounded-lg p-6 w-full max-w-md">
                     <div className="flex justify-between items-center mb-4">
                       <h3 className="text-lg font-semibold">Add Industry</h3>
-                      <Button variant="ghost" onClick={() => setShowAddIndustryDialog(false)}><X className="h-4 w-4" /></Button>
+                      <Button variant="ghost" onClick={() => {
+                        setShowAddIndustryDialog(false);
+                        setIndustryImageFile(null);
+                      }}><X className="h-4 w-4" /></Button>
                     </div>
                     <Input className="mb-2" placeholder="Name" value={newIndustry.name} onChange={e => setNewIndustry({ ...newIndustry, name: e.target.value })} />
-                    <Input className="mb-2" placeholder="Icon (emoji or SVG)" value={newIndustry.icon} onChange={e => setNewIndustry({ ...newIndustry, icon: e.target.value })} />
+                    
+                    {/* Image Upload Section */}
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Industry Icon/Image</label>
+                      <div className="flex items-center space-x-4">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => setIndustryImageFile(e.target.files?.[0] || null)}
+                          className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                        />
+                      </div>
+                      {industryImageFile && (
+                        <div className="mt-2">
+                          <img
+                            src={URL.createObjectURL(industryImageFile)}
+                            alt="Preview"
+                            className="w-16 h-16 object-cover rounded-lg border"
+                          />
+                        </div>
+                      )}
+                      <p className="text-xs text-gray-500 mt-1">Upload an image or use the icon field below for emoji/SVG</p>
+                    </div>
+                    
+                    <Input className="mb-2" placeholder="Icon (emoji or SVG) - optional if image uploaded" value={newIndustry.icon} onChange={e => setNewIndustry({ ...newIndustry, icon: e.target.value })} />
                     <Input className="mb-2" placeholder="Rank (number)" type="number" value={newIndustry.rank} onChange={e => setNewIndustry({ ...newIndustry, rank: Number(e.target.value) })} />
                     <Textarea className="mb-2" placeholder="Description" value={newIndustry.description} onChange={e => setNewIndustry({ ...newIndustry, description: e.target.value })} />
                     <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white" onClick={handleAddIndustry}>Add</Button>
@@ -3716,10 +4108,49 @@ export default function AdminDashboard() {
                   <div className="bg-white rounded-lg p-6 w-full max-w-md">
                     <div className="flex justify-between items-center mb-4">
                       <h3 className="text-lg font-semibold">Edit Industry</h3>
-                      <Button variant="ghost" onClick={() => setEditingIndustry(null)}><X className="h-4 w-4" /></Button>
+                      <Button variant="ghost" onClick={() => {
+                        setEditingIndustry(null);
+                        setEditingIndustryImageFile(null);
+                      }}><X className="h-4 w-4" /></Button>
                     </div>
                     <Input className="mb-2" placeholder="Name" value={editingIndustry?.name || ''} onChange={e => setEditingIndustry({ ...editingIndustry, name: e.target.value })} />
-                    <Input className="mb-2" placeholder="Icon (emoji or SVG)" value={editingIndustry?.icon || ''} onChange={e => setEditingIndustry({ ...editingIndustry, icon: e.target.value })} />
+                    
+                    {/* Current Image Display */}
+                    {editingIndustry?.icon && editingIndustry.icon.startsWith('http') && (
+                      <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Current Image</label>
+                        <img
+                          src={editingIndustry.icon}
+                          alt="Current icon"
+                          className="w-16 h-16 object-cover rounded-lg border"
+                        />
+                      </div>
+                    )}
+                    
+                    {/* Image Upload Section */}
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">New Industry Icon/Image</label>
+                      <div className="flex items-center space-x-4">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => setEditingIndustryImageFile(e.target.files?.[0] || null)}
+                          className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                        />
+                      </div>
+                      {editingIndustryImageFile && (
+                        <div className="mt-2">
+                          <img
+                            src={URL.createObjectURL(editingIndustryImageFile)}
+                            alt="Preview"
+                            className="w-16 h-16 object-cover rounded-lg border"
+                          />
+                        </div>
+                      )}
+                      <p className="text-xs text-gray-500 mt-1">Upload a new image or use the icon field below for emoji/SVG</p>
+                    </div>
+                    
+                    <Input className="mb-2" placeholder="Icon (emoji or SVG) - optional if image uploaded" value={editingIndustry?.icon || ''} onChange={e => setEditingIndustry({ ...editingIndustry, icon: e.target.value })} />
                     <Input className="mb-2" placeholder="Rank (number)" type="number" value={editingIndustry?.rank || 0} onChange={e => setEditingIndustry({ ...editingIndustry, rank: Number(e.target.value) })} />
                     <Textarea className="mb-2" placeholder="Description" value={editingIndustry?.description || ''} onChange={e => setEditingIndustry({ ...editingIndustry, description: e.target.value })} />
                     <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white" onClick={handleUpdateIndustry}>Update</Button>
@@ -4162,32 +4593,69 @@ function AdminGalleryManager() {
   const handleFileUpload = async (e, section, setter) => {
     const files = Array.from(e.target.files || []);
     setLoading(true);
-    for (const file of files) {
-      const formData = new FormData();
-      formData.append("section", section);
-      formData.append("image", file);
-      await fetch(API_URL, { method: "POST", body: formData });
+    
+    try {
+      for (const file of files) {
+        const formData = new FormData();
+        formData.append("section", section);
+        formData.append("image", file);
+        
+        const response = await fetch(API_URL, { method: "POST", body: formData });
+        if (!response.ok) {
+          throw new Error(`Failed to upload ${file.name}`);
+        }
+      }
+      await fetchImages(section, setter);
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert(`Upload failed: ${error.message}`);
+    } finally {
+      setLoading(false);
     }
-    await fetchImages(section, setter);
-    setLoading(false);
   };
   const handleAddLink = async (url, section, setter, clear) => {
     if (!url.trim()) return;
     setLoading(true);
-    await fetch(API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ section, url: url.trim() })
-    });
-    await fetchImages(section, setter);
-    clear();
-    setLoading(false);
+    
+    try {
+      const response = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ section, url: url.trim() })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to add image URL');
+      }
+      
+      await fetchImages(section, setter);
+      clear();
+    } catch (error) {
+      console.error('Add link error:', error);
+      alert(`Failed to add image: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
   };
   const handleDelete = async (id, section, setter) => {
+    if (!confirm('Are you sure you want to delete this image?')) return;
+    
     setLoading(true);
-    await fetch(`${API_URL}/${id}`, { method: "DELETE" });
-    await fetchImages(section, setter);
-    setLoading(false);
+    
+    try {
+      const response = await fetch(`${API_URL}/${id}`, { method: "DELETE" });
+      
+      if (!response.ok) {
+        throw new Error('Failed to delete image');
+      }
+      
+      await fetchImages(section, setter);
+    } catch (error) {
+      console.error('Delete error:', error);
+      alert(`Failed to delete image: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
   };
   return (
     <div className="py-6 px-2">
@@ -4196,9 +4664,11 @@ function AdminGalleryManager() {
       <section className="mb-8">
         <h3 className="text-lg font-semibold mb-2">Company Premises</h3>
         <div className="flex gap-4 mb-2">
-          <input type="file" accept="image/*" multiple onChange={e => handleFileUpload(e, "premises", setPremises)} disabled={loading} />
-          <input type="url" value={premisesLink} onChange={e => setPremisesLink(e.target.value)} placeholder="Image URL" className="border p-2" />
-          <button onClick={() => handleAddLink(premisesLink, "premises", setPremises, () => setPremisesLink(""))} className="bg-maroon-500 text-white px-3 py-1 rounded" disabled={loading}>Add Link</button>
+          <input type="file" accept="image/*" multiple onChange={e => handleFileUpload(e, "premises", setPremises)} disabled={loading} className="border p-2 rounded" />
+          <input type="url" value={premisesLink} onChange={e => setPremisesLink(e.target.value)} placeholder="Image URL" className="border p-2 rounded flex-1" />
+          <button onClick={() => handleAddLink(premisesLink, "premises", setPremises, () => setPremisesLink(""))} className="bg-maroon-500 text-white px-4 py-2 rounded hover:bg-maroon-600" disabled={loading}>
+            {loading ? "Adding..." : "Add Link"}
+          </button>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
           {premises.map((img) => (
@@ -4213,9 +4683,11 @@ function AdminGalleryManager() {
       <section className="mb-8">
         <h3 className="text-lg font-semibold mb-2">Events</h3>
         <div className="flex gap-4 mb-2">
-          <input type="file" accept="image/*" multiple onChange={e => handleFileUpload(e, "events", setEvents)} disabled={loading} />
-          <input type="url" value={eventsLink} onChange={e => setEventsLink(e.target.value)} placeholder="Image URL" className="border p-2" />
-          <button onClick={() => handleAddLink(eventsLink, "events", setEvents, () => setEventsLink(""))} className="bg-maroon-500 text-white px-3 py-1 rounded" disabled={loading}>Add Link</button>
+          <input type="file" accept="image/*" multiple onChange={e => handleFileUpload(e, "events", setEvents)} disabled={loading} className="border p-2 rounded" />
+          <input type="url" value={eventsLink} onChange={e => setEventsLink(e.target.value)} placeholder="Image URL" className="border p-2 rounded flex-1" />
+          <button onClick={() => handleAddLink(eventsLink, "events", setEvents, () => setEventsLink(""))} className="bg-maroon-500 text-white px-4 py-2 rounded hover:bg-maroon-600" disabled={loading}>
+            {loading ? "Adding..." : "Add Link"}
+          </button>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
           {events.map((img) => (
@@ -4230,9 +4702,11 @@ function AdminGalleryManager() {
       <section className="mb-8">
         <h3 className="text-lg font-semibold mb-2">Other Posts</h3>
         <div className="flex gap-4 mb-2">
-          <input type="file" accept="image/*" multiple onChange={e => handleFileUpload(e, "others", setOthers)} disabled={loading} />
-          <input type="url" value={othersLink} onChange={e => setOthersLink(e.target.value)} placeholder="Image URL" className="border p-2" />
-          <button onClick={() => handleAddLink(othersLink, "others", setOthers, () => setOthersLink(""))} className="bg-maroon-500 text-white px-3 py-1 rounded" disabled={loading}>Add Link</button>
+          <input type="file" accept="image/*" multiple onChange={e => handleFileUpload(e, "others", setOthers)} disabled={loading} className="border p-2 rounded" />
+          <input type="url" value={othersLink} onChange={e => setOthersLink(e.target.value)} placeholder="Image URL" className="border p-2 rounded flex-1" />
+          <button onClick={() => handleAddLink(othersLink, "others", setOthers, () => setOthersLink(""))} className="bg-maroon-500 text-white px-4 py-2 rounded hover:bg-maroon-600" disabled={loading}>
+            {loading ? "Adding..." : "Add Link"}
+          </button>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
           {others.map((img) => (

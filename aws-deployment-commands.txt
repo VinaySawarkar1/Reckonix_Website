@@ -1,0 +1,34 @@
+# AWS Deployment Commands
+# Run these commands on your AWS server after uploading files
+
+# 1. Navigate to project directory
+cd /home/ec2-user/reckonix
+
+# 2. Install dependencies
+npm install --production --no-optional
+
+# 3. Build the client
+npm run build
+
+# 4. Kill any existing processes
+pkill -f "tsx server/index.ts" || true
+pkill -f "node" || true
+
+# 5. Start the server
+nohup npx tsx server/index.ts > server.log 2>&1 &
+
+# 6. Check if server is running
+ps aux | grep tsx
+
+# 7. Check server logs
+tail -f server.log
+
+# 8. Restart Nginx (if needed)
+sudo systemctl restart nginx
+sudo systemctl status nginx
+
+# 9. Test server
+curl http://localhost:5001/api/products
+
+# 10. Check website
+curl http://your-domain.com

@@ -120,3 +120,6 @@ echo ""
 echo "📊 Monitor your deployment:"
 echo "   aws cloudformation describe-stacks --stack-name $STACK_NAME --region $REGION"
 echo "   aws ec2 describe-instances --instance-ids $INSTANCE_ID --region $REGION"
+
+
+

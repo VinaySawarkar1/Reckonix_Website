@@ -1,15 +1,14 @@
-import dotenv from "dotenv";
-dotenv.config();
+import 'dotenv/config';
 import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "./routes";
 import path from "path";
 
 // Console log removed for production);
 // Console log removed for production
 
 const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+// Increase body size limits for file uploads
+app.use(express.json({ limit: '100mb' }));
+app.use(express.urlencoded({ extended: false, limit: '100mb' }));
 
 // Serve uploads directory for product images
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
@@ -48,6 +47,7 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  const { registerRoutes } = await import("./routes");
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
